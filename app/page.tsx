@@ -1,303 +1,524 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { LinkButton } from "@/components/ui/link-button";
+
+// ─── DATA ──────────────────────────────────────────────────────────────────
+
+const CONNECTORS = [
+  { name: "GitHub",     icon: "🐙", category: "Code",       live: true  },
+  { name: "GitLab",     icon: "🦊", category: "Code",       live: true  },
+  { name: "AWS",        icon: "☁️", category: "Cloud",      live: true  },
+  { name: "Azure",      icon: "🔷", category: "Cloud",      live: false },
+  { name: "GCP",        icon: "🌐", category: "Cloud",      live: false },
+  { name: "Zapier",     icon: "⚡", category: "Automation", live: true  },
+  { name: "n8n",        icon: "🔄", category: "Automation", live: true  },
+  { name: "Make",       icon: "🔧", category: "Automation", live: false },
+  { name: "BambooHR",   icon: "🌿", category: "HR",         live: true  },
+  { name: "Rippling",   icon: "👥", category: "HR",         live: true  },
+  { name: "Workday",    icon: "📋", category: "HR",         live: false },
+  { name: "Bitbucket",  icon: "🪣", category: "Code",       live: false },
+];
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Connect your sources",
+    body: "One-click integrations with GitHub, GitLab, AWS, Zapier, n8n, and your HR systems. Credentials are AES-256 encrypted at rest.",
+  },
+  {
+    n: "02",
+    title: "Discover every AI asset",
+    body: "65+ detection patterns surface LLM API calls, ML models, automation workflows, AI feature flags, and internal scoring services - across every connected source.",
+  },
+  {
+    n: "03",
+    title: "Assign ownership automatically",
+    body: "Cross-reference HR data to identify current owners. Flag assets whose creators have left the company. Trigger automated re-ownership workflows.",
+  },
+  {
+    n: "04",
+    title: "Enforce governance policy",
+    body: "Create rules like 'all production AI must have an active owner' or 'no LLM may process PHI without a BAA.' Violations create tasks, trigger alerts, and feed audit logs.",
+  },
+];
+
+const FRAMEWORKS = [
+  { name: "HIPAA",       icon: "⚕️",  desc: "PHI exposure detection. Flags LLM integrations processing patient data without documented Business Associate Agreements." },
+  { name: "SOC 2",       icon: "🛡️",  desc: "AI system inventory for Type II audits. Maps to CC6.6, CC7.1, CC7.2, CC8.1, and availability controls." },
+  { name: "EU AI Act",   icon: "🇪🇺",  desc: "Risk categorization, human oversight documentation, and technical documentation requirements for high-risk AI systems." },
+  { name: "ISO 42001",   icon: "📋",  desc: "AI Management System controls. Governance policies, risk assessment, impact evaluation, and corrective action tracking." },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: "We connected Nexus to our GitHub org and found 14 AI integrations nobody had documented. Three of them were processing customer PII with no owner after two engineers left.",
+    name: "VP of Engineering",
+    co: "Series B Fintech",
+  },
+  {
+    quote: "Our SOC 2 auditor asked for an AI system inventory. Nexus gave us a complete report with ownership, risk scores, and compliance gaps in under an hour.",
+    name: "Head of Security",
+    co: "Healthcare SaaS",
+  },
+  {
+    quote: "We were building this internally. Then we saw Nexus. It would have taken us six months to get to feature parity. We signed up the same day.",
+    name: "CTO",
+    co: "Legal Tech Platform",
+  },
+];
+
+const PLANS = [
+  {
+    name: "Starter",
+    price: "$499",
+    period: "/mo",
+    desc: "For teams starting their AI governance program.",
+    features: [
+      "Up to 3 connectors",
+      "500 AI assets",
+      "Risk scoring + ownership",
+      "SOC 2 compliance report",
+      "Email alerts",
+      "API access",
+    ],
+    cta: "Start Free Trial",
+    highlighted: false,
+  },
+  {
+    name: "Professional",
+    price: "$2,500",
+    period: "/mo",
+    desc: "For companies under active compliance pressure.",
+    features: [
+      "Unlimited connectors",
+      "Unlimited assets",
+      "Full policy engine",
+      "All 4 compliance frameworks",
+      "Slack + webhook alerts",
+      "Audit log export",
+      "Priority support",
+    ],
+    cta: "Start Free Trial",
+    highlighted: true,
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    period: "",
+    desc: "For large organizations with complex requirements.",
+    features: [
+      "Multi-org management",
+      "SSO / SAML",
+      "Custom connector SDK",
+      "Dedicated success engineer",
+      "SLA guarantee",
+      "Security review + BAA",
+    ],
+    cta: "Talk to Sales",
+    highlighted: false,
+  },
+];
+
+// ─── PAGE ──────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-[#07070c] text-white antialiased">
 
-      {/* Nav */}
-      <header className="border-b border-white/10 sticky top-0 z-50 backdrop-blur bg-[#0a0a0f]/80">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-600">
-              <span className="text-sm font-bold text-white">N</span>
+      {/* ── NAV ─────────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#07070c]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 shadow-lg shadow-violet-900/40">
+              <span className="text-sm font-bold tracking-tight text-white">N</span>
             </div>
-            <span className="font-semibold text-lg tracking-tight">Nexus</span>
+            <span className="text-base font-semibold tracking-tight">Nexus</span>
+            <span className="hidden sm:inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-white/40">
+              AI Asset Management
+            </span>
           </div>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
-            <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
-            <a href="#connectors" className="hover:text-white transition-colors">Connectors</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+
+          {/* Nav links */}
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">
+            <a href="#platform" className="hover:text-white transition-colors duration-150">Platform</a>
+            <a href="#connectors" className="hover:text-white transition-colors duration-150">Connectors</a>
+            <a href="#compliance" className="hover:text-white transition-colors duration-150">Compliance</a>
+            <a href="#pricing" className="hover:text-white transition-colors duration-150">Pricing</a>
           </nav>
+
+          {/* Actions */}
           <div className="flex items-center gap-3">
-            <Link href="/auth/login">
-              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
-                Sign in
-              </Button>
+            <Link href="/auth/login" className="hidden sm:block text-sm font-medium text-white/50 hover:text-white transition-colors duration-150">
+              Sign in
+            </Link>
+            <Link href="/demo">
+              <button className="text-sm font-medium text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg px-4 py-2 transition-all duration-150">
+                View demo
+              </button>
             </Link>
             <Link href="/auth/login">
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
-                Start Free →
-              </Button>
+              <button className="text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-lg px-4 py-2 transition-colors duration-150 shadow-lg shadow-violet-900/30">
+                Get started →
+              </button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pt-24 pb-20 text-center">
-        <Badge className="mb-6 bg-violet-600/20 text-violet-400 border-violet-600/30 border">
-          AI Asset Management Platform
-        </Badge>
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.08]">
-          Every AI agent
-          <br />
-          <span className="text-violet-400">in your company.</span>
-          <br />
-          Mapped. Owned. Governed.
-        </h1>
-        <p className="mx-auto mt-8 max-w-2xl text-lg text-white/60 leading-relaxed">
-          Nexus connects to GitHub, AWS, GitLab, Zapier, n8n, and your HR systems
-          to discover every AI script, automation, and LLM integration — then assigns
-          ownership, scores risk, and enforces policy.
-          <br className="hidden sm:block" />
-          <span className="text-white/80"> Before your auditors find them first.</span>
-        </p>
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/auth/login">
-            <Button size="lg" className="bg-violet-600 hover:bg-violet-700 text-white px-8 h-12 text-base">
-              Start Free Scan →
-            </Button>
-          </Link>
-          <Link href="/demo">
-            <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 h-12 text-base px-8">
-              View Live Demo
-            </Button>
-          </Link>
+      {/* ── HERO ────────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden">
+        {/* Background glow */}
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
+          <div className="h-[600px] w-[1000px] rounded-full bg-violet-600/10 blur-[120px] -translate-y-1/3" />
         </div>
-        <p className="mt-4 text-sm text-white/30">No credit card. Connects in 2 minutes.</p>
+
+        <div className="relative mx-auto max-w-5xl px-6 pt-28 pb-24 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-4 py-1.5 text-sm text-violet-300 mb-8">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
+            Now supporting HIPAA, SOC 2, EU AI Act, and ISO 42001
+          </div>
+
+          <h1 className="text-5xl sm:text-[72px] font-bold tracking-tight leading-[1.04] text-white">
+            Your company runs on AI.
+            <br />
+            <span className="bg-gradient-to-r from-violet-400 to-violet-200 bg-clip-text text-transparent">
+              Do you know what&apos;s running?
+            </span>
+          </h1>
+
+          <p className="mx-auto mt-7 max-w-2xl text-xl text-white/50 leading-relaxed font-light">
+            Nexus discovers every AI agent, automation, and LLM integration across your
+            entire engineering stack - then assigns ownership, scores risk, and enforces
+            governance policy automatically.
+          </p>
+
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/auth/login">
+              <button className="h-12 px-8 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-base transition-colors shadow-xl shadow-violet-900/40">
+                Start free trial →
+              </button>
+            </Link>
+            <Link href="/demo">
+              <button className="h-12 px-8 rounded-xl border border-white/10 hover:border-white/20 text-white/80 hover:text-white font-medium text-base transition-all">
+                See a live scan
+              </button>
+            </Link>
+          </div>
+          <p className="mt-4 text-sm text-white/25">No credit card required · Connects in under 5 minutes · Cancel anytime</p>
+        </div>
       </section>
 
-      {/* Social proof numbers */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
-        <div className="mx-auto max-w-5xl px-6 py-12 grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+      {/* ── TRUST BAR ───────────────────────────────────────────────────── */}
+      <div className="border-y border-white/[0.06] bg-white/[0.015]">
+        <div className="mx-auto max-w-5xl px-6 py-5 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
           {[
-            { value: "10+", label: "Connectors" },
-            { value: "65+", label: "AI detection patterns" },
-            { value: "4", label: "Compliance frameworks" },
-            { value: "< 10min", label: "First scan to results" },
+            { v: "65+", l: "AI detection patterns" },
+            { v: "10+", l: "Source connectors" },
+            { v: "4",   l: "Compliance frameworks" },
+            { v: "< 10 min", l: "Time to first scan" },
+            { v: "AES-256", l: "Credential encryption" },
           ].map((s) => (
-            <div key={s.label}>
-              <div className="text-3xl font-bold text-white">{s.value}</div>
-              <div className="text-sm text-white/40 mt-1">{s.label}</div>
+            <div key={s.l} className="flex items-center gap-3">
+              <span className="text-xl font-bold text-white">{s.v}</span>
+              <span className="text-sm text-white/30">{s.l}</span>
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
-      {/* The problem */}
-      <section className="mx-auto max-w-5xl px-6 py-24">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold">Your engineers ship AI fast.<br />No one tracks where it goes.</h2>
-          <p className="mt-4 text-white/50 max-w-xl mx-auto">Every quarter, more AI agents, automations, and LLM integrations are added to your stack. Most are never inventoried. Many outlive the engineers who built them.</p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-6">
+      {/* ── PROBLEM ─────────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-28">
+        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">The problem</div>
+        <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-3xl">
+          Engineers ship AI fast.
+          <span className="text-white/30"> Nobody tracks where it goes.</span>
+        </h2>
+        <p className="mt-5 text-lg text-white/50 max-w-2xl leading-relaxed">
+          Every quarter, AI agents, LLM integrations, and ML services are added to your stack - often
+          without security review, compliance sign-off, or ownership documentation. When engineers leave,
+          their systems don&apos;t.
+        </p>
+
+        <div className="mt-14 grid sm:grid-cols-3 gap-5">
           {[
             {
               icon: "👻",
-              title: "Ghost Agents",
-              desc: "AI scripts still running in production — connected to your APIs, customer data, and payment systems — with no owner after their creator left.",
+              label: "Critical",
+              title: "Ghost AI agents",
+              body: "Autonomous scripts still running in production - connected to your APIs, customer data, and payment systems - with no identifiable owner. They don't appear in any inventory.",
             },
             {
               icon: "⚕️",
-              title: "PHI Exposure",
-              desc: "LLM integrations processing patient records, claims, or health data without documented BAAs or compliance review.",
+              label: "Critical",
+              title: "Undetected PHI exposure",
+              body: "LLM integrations quietly processing patient records, health claims, or sensitive data - without documented BAAs, without security review, and without compliance team awareness.",
             },
             {
-              icon: "🚨",
-              title: "Audit Failure",
-              desc: "SOC 2, ISO 42001, and EU AI Act auditors now ask for an AI system inventory. Most companies can't produce one.",
+              icon: "📋",
+              label: "High",
+              title: "Audit gaps",
+              body: "SOC 2, EU AI Act, and ISO 42001 auditors now require a full AI system inventory. Most engineering organizations can't produce one - and most compliance teams don't know to ask.",
             },
           ].map((item) => (
-            <div key={item.title} className="rounded-xl border border-white/10 bg-white/[0.03] p-6">
-              <div className="text-3xl mb-4">{item.icon}</div>
+            <div key={item.title} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-7 hover:border-white/[0.12] transition-colors">
+              <div className="flex items-start justify-between mb-5">
+                <span className="text-3xl">{item.icon}</span>
+                <span className="text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded-full">{item.label}</span>
+              </div>
               <h3 className="font-semibold text-white mb-2">{item.title}</h3>
-              <p className="text-sm text-white/50 leading-relaxed">{item.desc}</p>
+              <p className="text-sm text-white/45 leading-relaxed">{item.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" className="border-y border-white/10 bg-white/[0.02]">
-        <div className="mx-auto max-w-5xl px-6 py-24">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold">How Nexus works</h2>
-            <p className="mt-3 text-white/50">Connect. Discover. Govern.</p>
-          </div>
-          <div className="grid sm:grid-cols-4 gap-6">
-            {[
-              { step: "01", title: "Connect your sources", desc: "GitHub, GitLab, AWS, Zapier, n8n, and HR systems. One-click setup." },
-              { step: "02", title: "Discover everything", desc: "65+ detection patterns find LLM calls, ML models, automation workflows, and AI feature flags." },
-              { step: "03", title: "Assign ownership", desc: "Cross-reference HR data to find who owns each asset. Flag orphaned systems automatically." },
-              { step: "04", title: "Enforce policy", desc: "Set rules like 'all critical AI must have an owner' and auto-create tasks when violations are found." },
-            ].map((item) => (
-              <div key={item.step} className="relative">
-                <div className="text-xs font-mono text-violet-400 mb-3">{item.step}</div>
-                <h3 className="font-semibold text-white mb-2">{item.title}</h3>
-                <p className="text-sm text-white/50 leading-relaxed">{item.desc}</p>
+      {/* ── PLATFORM ────────────────────────────────────────────────────── */}
+      <section id="platform" className="border-y border-white/[0.06] bg-white/[0.015]">
+        <div className="mx-auto max-w-5xl px-6 py-28">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">The platform</div>
+          <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
+            Full lifecycle AI governance.
+          </h2>
+          <p className="mt-5 text-lg text-white/50 max-w-2xl">
+            From first detection to continuous compliance - Nexus manages the entire governance lifecycle for every AI system in your organization.
+          </p>
+
+          <div className="mt-16 grid sm:grid-cols-2 gap-5">
+            {STEPS.map((step) => (
+              <div key={step.n} className="rounded-2xl border border-white/[0.07] bg-[#0d0d14] p-7">
+                <div className="font-mono text-xs font-bold text-violet-400/60 mb-4">{step.n}</div>
+                <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
+                <p className="text-sm text-white/45 leading-relaxed">{step.body}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* Connectors */}
-      <section id="connectors" className="mx-auto max-w-5xl px-6 py-24">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold">Connects to your entire stack</h2>
-          <p className="mt-3 text-white/50">Not just GitHub. Every place your engineers ship AI.</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { name: "GitHub", icon: "🐙", desc: "Repos & code search", status: "live" },
-            { name: "GitLab", icon: "🦊", desc: "Self-hosted + cloud", status: "live" },
-            { name: "AWS", icon: "☁️", desc: "Lambda, Bedrock, SageMaker", status: "live" },
-            { name: "Zapier", icon: "⚡", desc: "AI workflow steps", status: "live" },
-            { name: "n8n", icon: "🔄", desc: "Self-hosted automation", status: "live" },
-            { name: "BambooHR", icon: "🌿", desc: "Employee ownership data", status: "live" },
-            { name: "Rippling", icon: "👥", desc: "HR + offboarding", status: "live" },
-            { name: "Azure", icon: "🔷", desc: "Azure OpenAI, DevOps", status: "soon" },
-            { name: "GCP", icon: "🌐", desc: "Vertex AI, BigQuery", status: "soon" },
-            { name: "Bitbucket", icon: "🪣", desc: "Atlassian repos", status: "soon" },
-            { name: "Make", icon: "🔧", desc: "Automation scenarios", status: "soon" },
-            { name: "Workday", icon: "📋", desc: "Enterprise HR", status: "soon" },
-          ].map((c) => (
-            <div key={c.name} className={`rounded-xl border p-4 ${c.status === "live" ? "border-white/10 bg-white/[0.03]" : "border-white/5 bg-white/[0.01] opacity-60"}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-2xl">{c.icon}</span>
-                {c.status === "soon" && <span className="text-xs text-white/30 bg-white/5 px-2 py-0.5 rounded-full">Soon</span>}
-                {c.status === "live" && <span className="text-xs text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Live</span>}
-              </div>
-              <div className="font-medium text-sm text-white">{c.name}</div>
-              <div className="text-xs text-white/40 mt-0.5">{c.desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Compliance */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
-        <div className="mx-auto max-w-5xl px-6 py-24">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold">Built for compliance</h2>
-            <p className="mt-3 text-white/50">Every finding maps to the regulations your auditors care about.</p>
-          </div>
-          <div className="grid sm:grid-cols-4 gap-6">
+          {/* Feature pills */}
+          <div className="mt-10 flex flex-wrap gap-3">
             {[
-              { name: "HIPAA", desc: "PHI exposure detection, BAA gap analysis", icon: "⚕️" },
-              { name: "SOC 2", desc: "AI system inventory, access controls, change management", icon: "🛡️" },
-              { name: "EU AI Act", desc: "Risk categorization, human oversight documentation", icon: "🇪🇺" },
-              { name: "ISO 42001", desc: "AI management system controls", icon: "📋" },
+              "Asset Registry", "Risk Scoring", "Ownership Engine", "Policy Builder",
+              "Compliance Reports", "Audit Logs", "Alert Delivery", "SDK Integration",
+              "Drift Detection", "Orphan Alerts"
             ].map((f) => (
-              <div key={f.name} className="rounded-xl border border-white/10 bg-white/[0.03] p-6">
-                <div className="text-2xl mb-3">{f.icon}</div>
-                <div className="font-semibold text-white mb-1">{f.name}</div>
-                <div className="text-sm text-white/50">{f.desc}</div>
+              <span key={f} className="text-xs font-medium text-white/50 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5">
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CONNECTORS ──────────────────────────────────────────────────── */}
+      <section id="connectors" className="mx-auto max-w-5xl px-6 py-28">
+        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Connectors</div>
+        <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
+          Not just GitHub.<br />
+          <span className="text-white/30">Your entire stack.</span>
+        </h2>
+        <p className="mt-5 text-lg text-white/50 max-w-2xl">
+          AI gets shipped everywhere - in repos, cloud functions, automation platforms, and HR-connected workflows. Nexus covers all of it.
+        </p>
+
+        <div className="mt-14 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+          {CONNECTORS.map((c) => (
+            <div key={c.name} className={`rounded-xl border p-4 flex flex-col items-center gap-2 text-center transition-colors ${
+              c.live
+                ? "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14]"
+                : "border-white/[0.04] bg-white/[0.01] opacity-40"
+            }`}>
+              <span className="text-2xl">{c.icon}</span>
+              <span className="text-xs font-medium text-white/70">{c.name}</span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                c.live
+                  ? "bg-emerald-400/10 text-emerald-400"
+                  : "bg-white/5 text-white/25"
+              }`}>
+                {c.live ? "Live" : "Soon"}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 p-5 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04]">
+          <p className="text-sm text-white/60">
+            <span className="font-semibold text-violet-300">Custom connector SDK</span> - instrument any internal tool or proprietary system. Available on Professional and Enterprise plans.
+          </p>
+        </div>
+      </section>
+
+      {/* ── COMPLIANCE ──────────────────────────────────────────────────── */}
+      <section id="compliance" className="border-y border-white/[0.06] bg-white/[0.015]">
+        <div className="mx-auto max-w-5xl px-6 py-28">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Compliance</div>
+          <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
+            Built for the regulations
+            <span className="text-white/30"> your auditors care about.</span>
+          </h2>
+          <p className="mt-5 text-lg text-white/50 max-w-2xl">
+            Every finding Nexus surfaces is mapped to the specific controls and articles required by each framework - not generic security advice.
+          </p>
+
+          <div className="mt-14 grid sm:grid-cols-2 gap-5">
+            {FRAMEWORKS.map((f) => (
+              <div key={f.name} className="rounded-2xl border border-white/[0.07] bg-[#0d0d14] p-7 flex gap-5">
+                <span className="text-3xl shrink-0">{f.icon}</span>
+                <div>
+                  <h3 className="font-semibold text-white mb-2">{f.name}</h3>
+                  <p className="text-sm text-white/45 leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 grid sm:grid-cols-3 gap-5">
+            {[
+              { title: "Automated evidence collection", body: "Every scan generates audit-ready evidence. Export structured reports for your assessors." },
+              { title: "Control mapping", body: "Findings are automatically mapped to the specific controls they violate - not just flagged generically." },
+              { title: "Gap tracking", body: "Track compliance posture over time. See which gaps you've closed and which are still open." },
+            ].map((item) => (
+              <div key={item.title} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-5">
+                <h4 className="text-sm font-semibold text-white mb-2">{item.title}</h4>
+                <p className="text-sm text-white/40 leading-relaxed">{item.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="mx-auto max-w-5xl px-6 py-24">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold">Simple pricing</h2>
-          <p className="mt-3 text-white/50">Start free. Upgrade when you need more.</p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {[
-            {
-              name: "Starter",
-              price: "$499",
-              per: "/month",
-              desc: "For teams just getting started with AI governance.",
-              features: ["Up to 3 connectors", "500 AI assets", "Basic risk scoring", "Email alerts", "SOC 2 report"],
-              cta: "Start Free",
-              highlight: false,
-            },
-            {
-              name: "Professional",
-              price: "$2,500",
-              per: "/month",
-              desc: "For companies serious about AI compliance.",
-              features: ["Unlimited connectors", "Unlimited assets", "Full risk engine", "Policy enforcement", "All 4 compliance frameworks", "Slack + webhook alerts", "Priority support"],
-              cta: "Start Free Trial",
-              highlight: true,
-            },
-            {
-              name: "Enterprise",
-              price: "Custom",
-              per: "",
-              desc: "For large organizations with complex needs.",
-              features: ["Multi-org support", "SSO / SAML", "Custom connectors", "Dedicated support", "SLA guarantee", "On-prem option"],
-              cta: "Contact Us",
-              highlight: false,
-            },
-          ].map((plan) => (
-            <div key={plan.name} className={`rounded-xl border p-6 flex flex-col ${plan.highlight ? "border-violet-500/50 bg-violet-600/10" : "border-white/10 bg-white/[0.03]"}`}>
-              {plan.highlight && <div className="text-xs font-semibold text-violet-400 mb-3 uppercase tracking-wider">Most Popular</div>}
-              <div className="font-bold text-xl text-white">{plan.name}</div>
-              <div className="mt-2 flex items-end gap-1">
-                <span className="text-4xl font-bold text-white">{plan.price}</span>
-                <span className="text-white/40 mb-1">{plan.per}</span>
+      {/* ── TESTIMONIALS ────────────────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 py-28">
+        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">What teams say</div>
+        <h2 className="text-4xl font-bold max-w-xl">The first scan is always surprising.</h2>
+
+        <div className="mt-14 grid sm:grid-cols-3 gap-5">
+          {TESTIMONIALS.map((t) => (
+            <div key={t.name} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7 flex flex-col gap-6">
+              <p className="text-white/60 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
+              <div>
+                <div className="text-sm font-semibold text-white">{t.name}</div>
+                <div className="text-xs text-white/30 mt-0.5">{t.co}</div>
               </div>
-              <p className="mt-2 text-sm text-white/50">{plan.desc}</p>
-              <ul className="mt-6 space-y-2 flex-1">
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECURITY ────────────────────────────────────────────────────── */}
+      <section className="border-y border-white/[0.06] bg-white/[0.015]">
+        <div className="mx-auto max-w-5xl px-6 py-20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
+            <div>
+              <div className="mb-3 text-sm font-semibold uppercase tracking-widest text-violet-400">Security</div>
+              <h2 className="text-2xl font-bold">Enterprise-grade security, by default.</h2>
+              <p className="mt-2 text-white/40 max-w-lg text-sm leading-relaxed">
+                Connector credentials are AES-256-GCM encrypted at rest. All access is scoped to your organization with enforced RBAC. Every sensitive action is audit-logged. We never store raw secrets.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 shrink-0">
+              {["AES-256-GCM encryption", "RBAC + audit logs", "SSRF protection", "CSP headers", "HSTS enforced", "Supabase RLS"].map((s) => (
+                <span key={s} className="text-xs text-white/50 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5">
+                  ✓ {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PRICING ─────────────────────────────────────────────────────── */}
+      <section id="pricing" className="mx-auto max-w-5xl px-6 py-28">
+        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Pricing</div>
+        <h2 className="text-4xl sm:text-5xl font-bold leading-tight">Straightforward pricing.</h2>
+        <p className="mt-4 text-white/50 text-lg">Start with a free trial. No credit card required.</p>
+
+        <div className="mt-14 grid sm:grid-cols-3 gap-5 items-start">
+          {PLANS.map((plan) => (
+            <div key={plan.name} className={`rounded-2xl border p-7 flex flex-col ${
+              plan.highlighted
+                ? "border-violet-500/40 bg-gradient-to-b from-violet-900/20 to-transparent"
+                : "border-white/[0.07] bg-white/[0.02]"
+            }`}>
+              {plan.highlighted && (
+                <div className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-4">Most popular</div>
+              )}
+              <div className="font-bold text-lg text-white">{plan.name}</div>
+              <div className="mt-3 flex items-end gap-1">
+                <span className="text-4xl font-bold text-white">{plan.price}</span>
+                <span className="text-white/30 text-sm mb-1">{plan.period}</span>
+              </div>
+              <p className="mt-2 text-sm text-white/40">{plan.desc}</p>
+              <ul className="mt-7 space-y-3 flex-1">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-white/70">
-                    <span className="text-emerald-400 shrink-0">✓</span>
+                  <li key={f} className="flex items-start gap-2.5 text-sm text-white/60">
+                    <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
                     {f}
                   </li>
                 ))}
               </ul>
-              <Link href="/auth/login" className="mt-8">
-                <Button className={`w-full ${plan.highlight ? "bg-violet-600 hover:bg-violet-700 text-white" : "bg-white/10 hover:bg-white/20 text-white border-0"}`}>
+              <Link href="/auth/login" className="mt-8 block">
+                <button className={`w-full h-11 rounded-xl font-semibold text-sm transition-colors ${
+                  plan.highlighted
+                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
+                    : "bg-white/[0.06] hover:bg-white/[0.10] text-white/80"
+                }`}>
                   {plan.cta}
-                </Button>
+                </button>
               </Link>
             </div>
           ))}
         </div>
+
+        <p className="mt-8 text-center text-sm text-white/25">
+          All plans include a 14-day free trial. No setup fees. Cancel anytime.
+        </p>
       </section>
 
-      {/* Final CTA */}
-      <section className="border-t border-white/10 bg-white/[0.02]">
-        <div className="mx-auto max-w-3xl px-6 py-24 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold">Know what AI is running in your company.</h2>
-          <p className="mt-4 text-white/50 text-lg">Connect your first source in 2 minutes. Free.</p>
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/auth/login">
-              <Button size="lg" className="bg-violet-600 hover:bg-violet-700 text-white px-10 h-12 text-base">
-                Start Free Scan →
-              </Button>
-            </Link>
-            <Link href="/demo">
-              <Button size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10 h-12 px-10 text-base">
-                View Demo First
-              </Button>
-            </Link>
+      {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
+      <section className="border-t border-white/[0.06]">
+        <div className="relative overflow-hidden mx-auto max-w-5xl px-6 py-28 text-center">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-[400px] w-[700px] rounded-full bg-violet-600/10 blur-[100px]" />
+          </div>
+          <div className="relative">
+            <h2 className="text-4xl sm:text-5xl font-bold leading-tight">
+              Know exactly what AI
+              <br />
+              is running in your company.
+            </h2>
+            <p className="mt-5 text-lg text-white/40">Connect your first source in under 5 minutes.</p>
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/auth/login">
+                <button className="h-12 px-10 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-base transition-colors shadow-xl shadow-violet-900/40">
+                  Start free trial →
+                </button>
+              </Link>
+              <Link href="/demo">
+                <button className="h-12 px-10 rounded-xl border border-white/10 hover:border-white/20 text-white/70 hover:text-white font-medium text-base transition-all">
+                  View a live scan
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10">
-        <div className="mx-auto max-w-5xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-violet-600">
+      {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+      <footer className="border-t border-white/[0.06]">
+        <div className="mx-auto max-w-5xl px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-6 w-6 place-items-center rounded bg-violet-600">
               <span className="text-xs font-bold text-white">N</span>
             </div>
-            <span className="text-sm font-semibold text-white/80">Nexus</span>
+            <span className="text-sm font-semibold text-white/70">Nexus</span>
+            <span className="text-white/20 text-sm">·</span>
+            <span className="text-sm text-white/25">AI Asset Management</span>
           </div>
-          <div className="text-sm text-white/30">AI Asset Management for the enterprise.</div>
-          <div className="flex gap-6 text-sm text-white/40">
-            <Link href="/auth/login" className="hover:text-white transition-colors">Login</Link>
-            <Link href="/demo" className="hover:text-white transition-colors">Demo</Link>
+          <div className="flex items-center gap-8 text-sm text-white/30">
+            <Link href="/demo" className="hover:text-white/60 transition-colors">Live demo</Link>
+            <Link href="/auth/login" className="hover:text-white/60 transition-colors">Sign in</Link>
+            <Link href="/auth/login" className="hover:text-white/60 transition-colors">Get started</Link>
           </div>
+          <div className="text-xs text-white/15">© 2026 Nexus. All rights reserved.</div>
         </div>
       </footer>
 
