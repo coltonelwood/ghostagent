@@ -16,11 +16,11 @@
   "crons": [
     {
       "path": "/api/internal/cleanup",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/internal/sync-worker",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
