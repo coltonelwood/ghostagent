@@ -27,10 +27,14 @@ export default async function DashboardPage() {
     .order("started_at", { ascending: false })
     .limit(10);
 
+  // Paginate agents — load max 100 most critical first to keep dashboard fast
   const { data: agents } = await supabase
     .from("agents")
     .select("*")
-    .eq("workspace_id", workspace.id);
+    .eq("workspace_id", workspace.id)
+    .order("risk_level", { ascending: true }) // critical first
+    .order("days_since_commit", { ascending: false }) // oldest first
+    .limit(100);
 
   const criticalCount = agents?.filter((a) => a.risk_level === "critical").length ?? 0;
   const highCount = agents?.filter((a) => a.risk_level === "high").length ?? 0;

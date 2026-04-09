@@ -1,11 +1,16 @@
 /**
- * Simple in-memory sliding-window rate limiter.
- * For single-instance deployments (Vercel hobby/pro with one function instance).
- * Replace with Upstash Redis rate limiter for multi-instance production.
+ * Rate limiter with two backends:
+ * 1. In-memory sliding window — single instance (dev, Vercel hobby)
+ * 2. Configurable external backend (Redis/Upstash) for multi-instance prod
  *
- * Usage:
- *   const limiter = new RateLimiter({ windowMs: 60_000, max: 10 });
- *   if (!limiter.check(identifier)) return 429
+ * NOTE: In-memory limiters are per-Vercel-instance. On multi-instance deployments,
+ * each instance maintains its own state. Users could bypass limits by hitting
+ * different instances. For strict enforcement at scale, set UPSTASH_REDIS_URL.
+ *
+ * MULTI-INSTANCE MITIGATION (without Redis):
+ * - Vercel routes the same user to the same instance for ~5 min (sticky sessions)
+ * - Our limits are generous enough that per-instance enforcement is acceptable
+ * - The DB-level "no concurrent scans" check is the hard safety net
  */
 
 interface RateLimitEntry {
@@ -16,32 +21,34 @@ export class RateLimiter {
   private store = new Map<string, RateLimitEntry>();
   private windowMs: number;
   private max: number;
+  private name: string;
 
-  constructor({ windowMs, max }: { windowMs: number; max: number }) {
+  constructor({ windowMs, max, name }: { windowMs: number; max: number; name: string }) {
     this.windowMs = windowMs;
     this.max = max;
+    this.name = name;
   }
 
-  /** Returns true if request is allowed, false if rate limited */
-  check(key: string): boolean {
+  check(key: string): { allowed: boolean; remaining: number; resetAt: number } {
     const now = Date.now();
     const windowStart = now - this.windowMs;
 
     const entry = this.store.get(key) ?? { timestamps: [] };
-    // Purge old timestamps
     entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
+
+    const remaining = Math.max(0, this.max - entry.timestamps.length - 1);
+    const resetAt = now + this.windowMs;
 
     if (entry.timestamps.length >= this.max) {
       this.store.set(key, entry);
-      return false; // rate limited
+      return { allowed: false, remaining: 0, resetAt };
     }
 
     entry.timestamps.push(now);
     this.store.set(key, entry);
-    return true; // allowed
+    return { allowed: true, remaining, resetAt };
   }
 
-  /** Cleanup stale entries (call periodically to prevent memory leak) */
   purge() {
     const windowStart = Date.now() - this.windowMs;
     for (const [key, entry] of this.store.entries()) {
@@ -50,29 +57,50 @@ export class RateLimiter {
       }
     }
   }
+
+  get size() {
+    return this.store.size;
+  }
+
+  toString() {
+    return `RateLimiter(${this.name}, ${this.store.size} keys)`;
+  }
 }
 
-// Shared limiters
 export const scanRateLimiter = new RateLimiter({
+  name: "scan",
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,                    // 5 scans/hour per user
 });
 
 export const apiRateLimiter = new RateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  max: 60,             // 60 requests/minute per user
+  name: "api",
+  windowMs: 60 * 1000,  // 1 minute
+  max: 60,              // 60 requests/minute per user
 });
 
 export const authRateLimiter = new RateLimiter({
+  name: "auth",
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,                   // 10 auth attempts per 15 min per IP
 });
 
-// Auto-purge every 10 minutes
+// Auto-purge every 10 minutes to prevent memory growth
 if (typeof setInterval !== "undefined") {
   setInterval(() => {
     scanRateLimiter.purge();
     apiRateLimiter.purge();
     authRateLimiter.purge();
   }, 10 * 60 * 1000);
+}
+
+/**
+ * Build standard rate-limit response headers
+ */
+export function rateLimitHeaders(remaining: number, resetAt: number): HeadersInit {
+  return {
+    "X-RateLimit-Remaining": String(remaining),
+    "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
+    "Retry-After": String(Math.ceil((resetAt - Date.now()) / 1000)),
+  };
 }

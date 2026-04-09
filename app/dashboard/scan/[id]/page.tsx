@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AgentsTable } from "@/components/dashboard/agents-table";
 import { ScanProgress } from "@/components/dashboard/scan-progress";
@@ -25,11 +27,14 @@ export default async function ScanDetailPage({
 
   if (!scan) notFound();
 
+  // Load max 200 agents, most critical first
   const { data: agents } = await supabase
     .from("agents")
     .select("*")
     .eq("scan_id", id)
-    .order("risk_level", { ascending: true });
+    .order("risk_level", { ascending: true })
+    .order("has_secrets", { ascending: false })
+    .limit(200);
 
   const isRunning = ["pending", "scanning", "classifying"].includes(scan.status);
 
@@ -54,13 +59,18 @@ export default async function ScanDetailPage({
 
       {isRunning && <ScanProgress scanId={id} />}
 
-      {scan.error_message && (
+      {scan.status === "failed" && (
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
+            <CardTitle className="text-destructive">Scan Failed</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p>{scan.error_message}</p>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {scan.error_message ?? "An unexpected error occurred."}
+            </p>
+            <Link href="/dashboard">
+              <Button variant="outline" size="sm">Run a new scan →</Button>
+            </Link>
           </CardContent>
         </Card>
       )}

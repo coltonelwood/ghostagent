@@ -4,6 +4,8 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface ScanStatus {
   status: string;
@@ -79,13 +81,20 @@ function ScanRunningInner() {
       <Card className="w-full max-w-lg bg-gray-900 border-gray-800">
         <CardHeader className="text-center">
           <div className="text-4xl mb-4">👻</div>
-          <CardTitle className="text-white text-2xl">
-            Scanning {org}{dots}
-          </CardTitle>
-          {scan.status === "failed" && (
-            <p className="text-red-400 text-sm mt-2">
-              {scan.error_message || "Scan failed. Please check your token and try again."}
-            </p>
+          {scan.status === "failed" ? (
+            <>
+              <CardTitle className="text-white text-2xl">Scan Failed</CardTitle>
+              <p className="text-red-400 text-sm mt-2">
+                {scan.error_message || "Scan failed. Please check your token and try again."}
+              </p>
+              <Link href="/dashboard/settings" className="mt-4 inline-block">
+                <Button variant="outline" size="sm">Check GitHub Settings</Button>
+              </Link>
+            </>
+          ) : (
+            <CardTitle className="text-white text-2xl">
+              Scanning {org}{dots}
+            </CardTitle>
           )}
         </CardHeader>
         <CardContent className="space-y-6">

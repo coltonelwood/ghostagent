@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { canRunScan } from "@/lib/stripe";
 import { runScan } from "@/lib/scanner";
 import { apiLogger } from "@/lib/logger";
-import { scanRateLimiter } from "@/lib/rate-limit";
+import { scanRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +19,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limit: 5 scans per hour per user
-  if (!scanRateLimiter.check(user.id)) {
+  const rateCheck = scanRateLimiter.check(user.id);
+  if (!rateCheck.allowed) {
     apiLogger.warn({ userId: user.id }, "scan rate limit exceeded");
     return NextResponse.json(
       { error: "Too many scan requests. Limit is 5 scans per hour." },
-      { status: 429, headers: { "Retry-After": "3600" } }
+      { status: 429, headers: rateLimitHeaders(0, rateCheck.resetAt) }
     );
   }
 
