@@ -11,9 +11,10 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
+  // Never select github_token on client-facing queries
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("*")
+    .select("id, owner_id, name, github_org, stripe_customer_id, stripe_sub_id, plan, scan_count, created_at")
     .eq("owner_id", user.id)
     .single();
 

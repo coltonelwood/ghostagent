@@ -1,4 +1,5 @@
 -- Organizations / workspaces
+-- Encrypt github_token at rest (pgcrypto) in prod; here stored as text with RLS isolation
 CREATE TABLE workspaces (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid REFERENCES auth.users NOT NULL,
@@ -63,3 +64,20 @@ CREATE POLICY "Users see their agents" ON agents
   FOR ALL USING (
     workspace_id IN (SELECT id FROM workspaces WHERE owner_id = auth.uid())
   );
+
+-- Performance indexes
+CREATE INDEX idx_workspaces_owner ON workspaces(owner_id);
+CREATE INDEX idx_scans_workspace ON scans(workspace_id);
+CREATE INDEX idx_scans_status ON scans(status);
+CREATE INDEX idx_agents_workspace ON agents(workspace_id);
+CREATE INDEX idx_agents_scan ON agents(scan_id);
+CREATE INDEX idx_agents_risk ON agents(risk_level);
+CREATE INDEX idx_agents_status ON agents(status);
+
+-- adminClient service-role bypass (insert workspace on signup)
+CREATE POLICY "Service role full access workspaces" ON workspaces
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access scans" ON scans
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access agents" ON agents
+  FOR ALL TO service_role USING (true) WITH CHECK (true);

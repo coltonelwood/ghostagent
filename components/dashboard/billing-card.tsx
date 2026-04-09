@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import type { Workspace } from "@/lib/types";
 
 export function BillingCard({ workspace }: { workspace: Workspace }) {
@@ -24,9 +25,13 @@ export function BillingCard({ workspace }: { workspace: Workspace }) {
         body: JSON.stringify({ workspace_id: workspace.id }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to start checkout");
+        return;
       }
+      if (data.url) window.location.href = data.url;
+    } catch {
+      toast.error("Network error — please try again");
     } finally {
       setLoading(false);
     }
@@ -41,9 +46,13 @@ export function BillingCard({ workspace }: { workspace: Workspace }) {
         body: JSON.stringify({ workspace_id: workspace.id }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to open billing portal");
+        return;
       }
+      if (data.url) window.location.href = data.url;
+    } catch {
+      toast.error("Network error — please try again");
     } finally {
       setLoading(false);
     }
@@ -76,7 +85,7 @@ export function BillingCard({ workspace }: { workspace: Workspace }) {
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-bold">$99</span>
+                  <span className="text-2xl font-bold">$399</span>
                   <span className="text-muted-foreground">/mo</span>
                 </div>
               </div>

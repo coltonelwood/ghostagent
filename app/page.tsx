@@ -159,7 +159,7 @@ export default function LandingPage() {
                   <Badge>Popular</Badge>
                 </div>
                 <div className="mt-2">
-                  <span className="text-3xl font-bold">$99</span>
+                  <span className="text-3xl font-bold">$399</span>
                   <span className="text-muted-foreground">/month</span>
                 </div>
               </CardHeader>

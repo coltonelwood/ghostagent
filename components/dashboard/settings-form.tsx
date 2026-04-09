@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,23 +26,28 @@ export function SettingsForm({ workspace }: { workspace: Workspace }) {
     e.preventDefault();
     setSaving(true);
 
-    const supabase = createClient();
-    const updates: Record<string, string> = { name, github_org: githubOrg };
-    if (githubToken) {
-      updates.github_token = githubToken;
-    }
+    const body: Record<string, string> = { name, github_org: githubOrg };
+    if (githubToken) body.github_token = githubToken;
 
-    const { error } = await supabase
-      .from("workspaces")
-      .update(updates)
-      .eq("id", workspace.id);
+    try {
+      const res = await fetch("/api/workspace/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
 
-    setSaving(false);
-    if (error) {
-      toast.error("Failed to save settings");
-    } else {
-      toast.success("Settings saved");
-      router.refresh();
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to save settings");
+      } else {
+        toast.success("Settings saved");
+        setGithubToken(""); // clear token field after save
+        router.refresh();
+      }
+    } catch {
+      toast.error("Network error — please try again");
+    } finally {
+      setSaving(false);
     }
   };
 

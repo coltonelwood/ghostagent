@@ -12,25 +12,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { workspace_id } = await req.json();
+  let body: { workspace_id?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { workspace_id } = body;
+  if (!workspace_id || typeof workspace_id !== "string") {
+    return NextResponse.json({ error: "workspace_id is required" }, { status: 400 });
+  }
 
   const { data: workspace } = await supabase
     .from("workspaces")
     .select("stripe_customer_id")
     .eq("id", workspace_id)
+    .eq("owner_id", user.id) // ownership check
     .single();
 
-  if (!workspace?.stripe_customer_id) {
-    return NextResponse.json(
-      { error: "No billing account found" },
-      { status: 400 }
-    );
+  if (!workspace) {
+    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 
-  const session = await stripe.billingPortal.sessions.create({
-    customer: workspace.stripe_customer_id,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings`,
-  });
+  if (!workspace.stripe_customer_id) {
+    return NextResponse.json({ error: "No billing account found" }, { status: 400 });
+  }
 
-  return NextResponse.json({ url: session.url });
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: workspace.stripe_customer_id,
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings`,
+    });
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Billing error";
+    console.error("[billing/portal]", message);
+    return NextResponse.json({ error: "Failed to open billing portal" }, { status: 500 });
+  }
 }

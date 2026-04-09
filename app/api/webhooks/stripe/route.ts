@@ -3,18 +3,33 @@ import { stripe } from "@/lib/stripe";
 import { adminClient } from "@/lib/supabase/admin";
 import Stripe from "stripe";
 
+export const runtime = "nodejs";
+// Do NOT parse body — Stripe needs raw bytes for signature verification
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const sig = req.headers.get("stripe-signature")!;
+  const sig = req.headers.get("stripe-signature");
+
+  if (!sig) {
+    return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+  }
+
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("[webhook] STRIPE_WEBHOOK_SECRET not set");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
 
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Invalid signature";
+    console.error("[webhook] signature verification failed:", message);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 

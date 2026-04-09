@@ -47,5 +47,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/auth/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/scan/:path*",
+    "/auth/:path*",
+    // Exclude static files and API routes (Stripe webhook needs raw body)
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/internal).*)",
+  ],
 };

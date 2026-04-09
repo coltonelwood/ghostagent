@@ -177,8 +177,12 @@ export async function runScan(scanId: string, workspaceId: string) {
       // Search for agent patterns in this repo
       for (const pattern of AGENT_PATTERNS) {
         try {
+          // Add delay between search requests to avoid GitHub search rate limits
+          // GitHub search API: 30 requests/min for authenticated users
+          await new Promise((r) => setTimeout(r, 2100));
+
           const searchResult = await octokit.search.code({
-            q: `${pattern.query} org:${workspace.github_org} repo:${repo.full_name}`,
+            q: `${pattern.query} repo:${repo.full_name}`,
             per_page: 10,
           });
 
@@ -208,10 +212,22 @@ export async function runScan(scanId: string, workspaceId: string) {
               });
 
               if ("content" in fileContent.data && fileContent.data.content) {
-                const content = Buffer.from(
-                  fileContent.data.content,
-                  "base64"
-                ).toString("utf-8");
+                // Skip binary files (images, zips, etc.)
+                const encoding = (fileContent.data as { encoding?: string }).encoding;
+                if (encoding !== "base64") continue;
+
+                let content: string;
+                try {
+                  content = Buffer.from(
+                    fileContent.data.content,
+                    "base64"
+                  ).toString("utf-8");
+                } catch {
+                  continue; // skip undecodable files
+                }
+
+                // Skip files that are clearly not agent code (>500KB likely generated)
+                if (content.length > 500_000) continue;
 
                 // Get last commit info for this file
                 const commits = await octokit.repos.listCommits({

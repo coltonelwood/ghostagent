@@ -31,15 +31,28 @@ function ScanRunningInner() {
   useEffect(() => {
     if (!scanId) return;
 
-    const poll = async () => {
-      const res = await fetch(`/api/scan/status?scanId=${scanId}`);
-      const data = await res.json();
-      setScan(data);
+    let attempts = 0;
+    const MAX_ATTEMPTS = 100; // 5 minutes at 3s intervals
 
-      if (data.status === "complete") {
-        router.push("/dashboard?scan=complete");
-      } else if (data.status === "failed") {
-        // stay on page, show error
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/scan/status?id=${scanId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setScan(data);
+        attempts++;
+
+        if (data.status === "complete" || data.status === "completed") {
+          clearInterval(interval);
+          router.push(`/dashboard/scan/${scanId}`);
+        } else if (data.status === "failed") {
+          clearInterval(interval);
+        } else if (attempts >= MAX_ATTEMPTS) {
+          clearInterval(interval);
+          setScan((prev) => ({ ...prev, status: "failed", error_message: "Scan timed out after 5 minutes." }));
+        }
+      } catch {
+        // Network error — keep polling
       }
     };
 

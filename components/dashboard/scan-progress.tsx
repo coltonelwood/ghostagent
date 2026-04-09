@@ -20,6 +20,7 @@ export function ScanProgress({ scanId }: { scanId: string }) {
           setReposScanned(data.scan.repos_scanned);
           if (
             data.scan.status === "completed" ||
+            data.scan.status === "complete" ||
             data.scan.status === "failed"
           ) {
             clearInterval(poll);

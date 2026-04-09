@@ -3,7 +3,8 @@ export interface Workspace {
   owner_id: string;
   name: string;
   github_org: string | null;
-  github_token: string | null;
+  // github_token intentionally omitted from client-facing type — never expose to UI
+  github_token?: string | null;
   stripe_customer_id: string | null;
   stripe_sub_id: string | null;
   plan: "trial" | "pro" | "enterprise";
