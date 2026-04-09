@@ -10,21 +10,40 @@ function getOpenAI() {
   return _openai;
 }
 
-// Cap repos scanned per run to stay within Vercel 300s limit
-// 50 repos × 12 patterns × 2.1s = ~21 min — too long
-// 10 repos × 12 patterns × 2.1s = ~4.2 min — safe for 300s limit
 const MAX_REPOS_PER_SCAN = 10;
 
-// Reduce patterns to highest-signal ones only
+// ─── DETECTION PATTERNS ───────────────────────────────────────────────────
+// Tier 1: Direct LLM/agent framework usage
 const AGENT_PATTERNS = [
-  { query: "langchain", label: "LangChain" },
-  { query: "ChatOpenAI", label: "LangChain" },
-  { query: "openai.chat.completions", label: "OpenAI" },
-  { query: "anthropic", label: "Anthropic" },
-  { query: "crewai", label: "CrewAI" },
-  { query: "AgentExecutor", label: "LangChain" },
+  { query: "langchain",                      label: "LangChain",       tier: 1 },
+  { query: "ChatOpenAI",                     label: "LangChain",       tier: 1 },
+  { query: "openai.chat.completions",        label: "OpenAI",          tier: 1 },
+  { query: "anthropic",                      label: "Anthropic",       tier: 1 },
+  { query: "crewai",                         label: "CrewAI",          tier: 1 },
+  { query: "AgentExecutor",                  label: "LangChain",       tier: 1 },
+  // Tier 2: Custom ML services
+  { query: "ML_SCORING_SERVICE_URL",         label: "ML Service",      tier: 2 },
+  { query: "ML_MODEL_VERSION",               label: "ML Service",      tier: 2 },
+  { query: "ML_CONFIDENCE_THRESHOLD",        label: "ML Service",      tier: 2 },
+  { query: "inference_endpoint",             label: "ML Service",      tier: 2 },
+  { query: "model_version",                  label: "ML Service",      tier: 2 },
+  { query: "scoring_service",                label: "ML Service",      tier: 2 },
+  // Tier 3: AI feature flags
+  { query: "FF_AI_",                         label: "AI Feature Flag", tier: 3 },
+  { query: "enable_ai",                      label: "AI Feature Flag", tier: 3 },
+  { query: "ai_enabled",                     label: "AI Feature Flag", tier: 3 },
+  { query: "ai_review",                      label: "AI Feature Flag", tier: 3 },
+  // Tier 4: Document AI / OCR
+  { query: "textract",                       label: "Document AI",     tier: 4 },
+  { query: "ocr_process",                    label: "Document AI",     tier: 4 },
+  { query: "document_intelligence",          label: "Document AI",     tier: 4 },
+  { query: "vision_api",                     label: "Document AI",     tier: 4 },
+  // Tier 5: Anomaly / ML detection scripts
+  { query: "anomaly_detection",              label: "ML Agent",        tier: 5 },
+  { query: "ANOMALY_THRESHOLD",              label: "ML Agent",        tier: 5 },
+  { query: "fraud_model",                    label: "ML Agent",        tier: 5 },
+  { query: "claims-fraud",                   label: "ML Agent",        tier: 5 },
 ];
-// 6 patterns × 10 repos × 2.1s = 2.1 min — safe within any Vercel plan
 
 const SERVICE_PATTERNS: Record<string, RegExp> = {
   stripe: /stripe|Stripe/,
@@ -39,7 +58,33 @@ const SERVICE_PATTERNS: Record<string, RegExp> = {
   aws: /boto3|aws-sdk|@aws-sdk/,
   gmail: /gmail|smtplib/i,
   notion: /notion\.so|NotionClient/i,
+  openai: /openai|gpt-4|gpt-3/i,
+  anthropic: /anthropic|claude/i,
+  bedrock: /bedrock|SageMaker/i,
 };
+
+// ─── PHI ENVIRONMENT SIGNALS ─────────────────────────────────────────────
+// If any of these exist in the repo env/config, the repo handles PHI
+const PHI_ENV_SIGNALS = [
+  /HIPAA/i,
+  /hipaa_audit/i,
+  /phi_/i,
+  /hl7|fhir/i,
+  /epic_client|cerner_client|athena_client/i,
+  /ENCRYPTION_AT_REST/i,
+  /mrn|medical.record/i,
+];
+
+// ─── PROTOTYPE / EXPERIMENT SIGNALS ──────────────────────────────────────
+const PROTOTYPE_PATH_SIGNALS = [
+  /^experiments\//i,
+  /^prototype/i,
+  /\/proto\//i,
+  /\/spike\//i,
+  /\/poc\//i,
+  /-prototype/i,
+  /-experimental/i,
+];
 
 function extractServices(content: string): string[] {
   return Object.entries(SERVICE_PATTERNS)
@@ -58,6 +103,79 @@ function detectSecrets(content: string): boolean {
   return patterns.some((p) => p.test(content));
 }
 
+function isPrototypePath(filePath: string): boolean {
+  return PROTOTYPE_PATH_SIGNALS.some((p) => p.test(filePath));
+}
+
+function detectsPhiContext(content: string): boolean {
+  return PHI_ENV_SIGNALS.some((p) => p.test(content));
+}
+
+/**
+ * Compute a base risk score BEFORE GPT classification.
+ * GPT can override, but this ensures the heuristic fallback is strong.
+ */
+function computeBaseRisk(agent: FoundAgent): {
+  floor: string;
+  escalationReasons: string[];
+} {
+  const reasons: string[] = [];
+  let level = "medium";
+
+  // Secrets → always critical
+  if (agent.has_secrets) {
+    level = "critical";
+    reasons.push("hardcoded secrets detected");
+  }
+
+  // LLM + PHI environment = critical
+  if (
+    (agent.agent_type === "OpenAI" || agent.agent_type === "Anthropic" ||
+     agent.agent_type === "LangChain" || agent.agent_type === "ML Service" ||
+     agent.services.includes("openai") || agent.services.includes("anthropic")) &&
+    agent.phi_context
+  ) {
+    level = "critical";
+    reasons.push("LLM integration in HIPAA/PHI environment — potential data compliance violation");
+  }
+
+  // Prototype path → minimum high
+  if (agent.is_prototype) {
+    if (level !== "critical") level = "high";
+    reasons.push("prototype/experiment code in production repo — likely no owner or governance");
+  }
+
+  // ML service (internal scoring endpoint) → high
+  if (agent.agent_type === "ML Service") {
+    if (level !== "critical") level = "high";
+    reasons.push("custom ML scoring service — verify owner and data access scope");
+  }
+
+  // AI feature flag → medium minimum, flag as dormant AI risk
+  if (agent.agent_type === "AI Feature Flag") {
+    reasons.push("disabled AI system exists in codebase — no documented owner or activation criteria");
+  }
+
+  // Long dormancy escalations
+  if (agent.days_since_commit !== null) {
+    if (agent.days_since_commit > 180 && level !== "critical") {
+      level = "critical";
+      reasons.push(`owner gone ${agent.days_since_commit} days — system likely orphaned`);
+    } else if (agent.days_since_commit > 90 && level === "medium") {
+      level = "high";
+      reasons.push(`no commits in ${agent.days_since_commit} days — likely unowned`);
+    }
+  }
+
+  // Many external services → elevate
+  if (agent.services.length >= 3 && level === "medium") {
+    level = "high";
+    reasons.push(`connects to ${agent.services.length} external services`);
+  }
+
+  return { floor: level, escalationReasons: reasons };
+}
+
 interface FoundAgent {
   name: string;
   repo: string;
@@ -70,34 +188,48 @@ interface FoundAgent {
   agent_type: string;
   services: string[];
   has_secrets: boolean;
+  is_prototype: boolean;
+  phi_context: boolean;
+  tier: number;
 }
 
 async function classifyAgent(
   agent: FoundAgent
 ): Promise<{ risk_level: string; risk_reason: string; description: string }> {
-  const prompt = `You are a security analyst. Classify this AI agent found in a GitHub organization.
+  const { floor, escalationReasons } = computeBaseRisk(agent);
 
-Agent file: ${agent.file_path}
+  const escalationNote = escalationReasons.length > 0
+    ? `\n\nPRE-COMPUTED ESCALATIONS (must honor these — do not downgrade below "${floor}"):\n` +
+      escalationReasons.map((r) => `- ${r}`).join("\n")
+    : "";
+
+  const prompt = `You are a security analyst. Classify this AI asset found in a GitHub organization.
+
+Asset file: ${agent.file_path}
 Repository: ${agent.repo}
-Agent type: ${agent.agent_type}
+Asset type: ${agent.agent_type}
 Last commit by: ${agent.owner_github ?? "unknown"}
 Days since last commit: ${agent.days_since_commit ?? "unknown"}
 Connected services: ${agent.services.join(", ") || "none detected"}
 Contains hardcoded secrets: ${agent.has_secrets}
+In prototype/experiment directory: ${agent.is_prototype}
+PHI/HIPAA environment signals: ${agent.phi_context}
+${escalationNote}
 
 Code snippet (first 2000 chars):
 ${agent.content.slice(0, 2000)}
 
 Respond in JSON with:
 - risk_level: "critical" | "high" | "medium" | "low"
-- risk_reason: one sentence explaining the risk
-- description: one sentence describing what this agent does
+- risk_reason: one sentence explaining the primary risk
+- description: one sentence describing what this asset does
 
 Rules:
-- critical: has secrets, connects to payment/customer systems, owner gone >180 days
-- high: connects to external services, owner gone >90 days
-- medium: runs autonomously, owner gone >30 days
-- low: simple scripts, recently maintained`;
+- critical: secrets present, LLM+PHI environment, owner gone >180 days, prototype with no auth
+- high: connects to external services + owner gone >90 days, custom ML service, unreviewed prototype
+- medium: runs autonomously, owner gone >30 days, AI feature flag (dormant)
+- low: simple scripts, recently maintained, well-documented owner
+- Never downgrade below the pre-computed floor: "${floor}"`;
 
   try {
     const response = await withRetry(
@@ -120,31 +252,33 @@ Rules:
     );
 
     const result = JSON.parse(response.choices[0].message.content ?? "{}");
+
+    // Enforce floor — GPT cannot downgrade past heuristic minimum
+    const RISK_ORDER = ["low", "medium", "high", "critical"];
+    const resultLevel = result.risk_level ?? floor;
+    const finalLevel =
+      RISK_ORDER.indexOf(resultLevel) >= RISK_ORDER.indexOf(floor)
+        ? resultLevel
+        : floor;
+
+    const allReasons = [result.risk_reason, ...escalationReasons].filter(Boolean).join("; ");
+
     return {
-      risk_level: result.risk_level ?? "medium",
-      risk_reason: result.risk_reason ?? "Unable to classify",
-      description: result.description ?? "AI agent detected",
+      risk_level: finalLevel,
+      risk_reason: allReasons.slice(0, 500),
+      description: result.description ?? "AI asset detected",
     };
   } catch {
-    // Heuristic fallback — never fail the scan because GPT-4o is down
-    let risk_level = "medium";
-    if (agent.has_secrets || (agent.days_since_commit && agent.days_since_commit > 180)) {
-      risk_level = "critical";
-    } else if (agent.services.length > 2 || (agent.days_since_commit && agent.days_since_commit > 90)) {
-      risk_level = "high";
-    } else if (agent.days_since_commit && agent.days_since_commit < 30) {
-      risk_level = "low";
-    }
+    // Heuristic fallback — never fail the scan because GPT is down
     return {
-      risk_level,
-      risk_reason: "Classified by heuristic (AI unavailable)",
-      description: `${agent.agent_type} agent in ${agent.repo}`,
+      risk_level: floor,
+      risk_reason: escalationReasons.join("; ") || "Classified by heuristic (AI unavailable)",
+      description: `${agent.agent_type} in ${agent.repo}`,
     };
   }
 }
 
 export async function runScan(scanId: string, workspaceId: string) {
-  // Get workspace details
   const { data: workspace } = await adminClient
     .from("workspaces")
     .select("*")
@@ -166,44 +300,109 @@ export async function runScan(scanId: string, workspaceId: string) {
 
   scanLogger.info({ scanId, workspaceId, org: workspace.github_org }, "scan: starting");
 
-  await adminClient
-    .from("scans")
-    .update({ status: "scanning" })
-    .eq("id", scanId);
+  await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
 
   const scanStart = Date.now();
-  // Hard time limit: 4 minutes (leave 60s buffer for Vercel's 300s limit)
   const TIME_LIMIT_MS = 4 * 60 * 1000;
 
   try {
-    // Fetch repos — capped
     const repos = await withRetry(
       () => octokit.paginate(octokit.repos.listForOrg, {
         org: workspace.github_org,
         per_page: 100,
         type: "all",
-        sort: "pushed",     // Most recently active repos first
-        direction: "desc",  // Most likely to have AI agents
+        sort: "pushed",
+        direction: "desc",
       }),
       { label: `listForOrg(${workspace.github_org})`, maxAttempts: 3 }
     );
 
-    // Cap to MAX_REPOS_PER_SCAN most recently active
     const targetRepos = repos.slice(0, MAX_REPOS_PER_SCAN);
 
     scanLogger.info({
       scanId,
       totalRepos: repos.length,
       scanning: targetRepos.length,
-    }, "scan: repos fetched, scanning subset");
+    }, "scan: repos fetched");
 
     const foundAgents: FoundAgent[] = [];
     let reposScanned = 0;
 
+    // Fetch .env.example / .env.example.* from the org's repos to detect
+    // PHI context and ML service env vars — single search, not per-pattern
+    const envFileCache: Record<string, string> = {};
+    for (const repo of targetRepos.slice(0, 3)) {
+      try {
+        const envFile = await octokit.repos.getContent({
+          owner: workspace.github_org,
+          repo: repo.name,
+          path: ".env.example",
+        });
+        if ("content" in envFile.data && envFile.data.content) {
+          const content = Buffer.from(envFile.data.content, "base64").toString("utf-8");
+          envFileCache[repo.full_name] = content;
+
+          // Check for ML service env vars directly
+          if (
+            /ML_SCORING_SERVICE_URL|ML_MODEL_VERSION|ML_CONFIDENCE_THRESHOLD/i.test(content) ||
+            /OPENAI_API_KEY|ANTHROPIC_API_KEY|FF_AI_/i.test(content)
+          ) {
+            const isPhiRepo = detectsPhiContext(content);
+            const hasOpenAI = /OPENAI_API_KEY/i.test(content);
+            const hasMlService = /ML_SCORING_SERVICE_URL/i.test(content);
+            const hasAIFlag = /FF_AI_[A-Z_]+=false/i.test(content);
+
+            if (hasOpenAI || hasMlService) {
+              foundAgents.push({
+                name: ".env.example",
+                repo: repo.full_name,
+                file_path: ".env.example",
+                content: content.slice(0, 2000),
+                owner_github: null,
+                owner_email: null,
+                last_commit_at: null,
+                days_since_commit: null,
+                agent_type: hasMlService ? "ML Service" : "OpenAI",
+                services: extractServices(content),
+                has_secrets: detectSecrets(content),
+                is_prototype: false,
+                phi_context: isPhiRepo,
+                tier: hasMlService ? 2 : 1,
+              });
+            }
+
+            if (hasAIFlag) {
+              // Extract which flags
+              const flagMatches = content.match(/FF_AI_[A-Z_]+=\w+/gi) ?? [];
+              for (const flag of flagMatches) {
+                foundAgents.push({
+                  name: flag,
+                  repo: repo.full_name,
+                  file_path: ".env.example",
+                  content: `Feature flag: ${flag}\n\nFull env context:\n${content.slice(0, 1000)}`,
+                  owner_github: null,
+                  owner_email: null,
+                  last_commit_at: null,
+                  days_since_commit: null,
+                  agent_type: "AI Feature Flag",
+                  services: [],
+                  has_secrets: false,
+                  is_prototype: false,
+                  phi_context: isPhiRepo,
+                  tier: 3,
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // No .env.example in this repo — fine
+      }
+    }
+
     for (const repo of targetRepos) {
-      // Time-based safety valve — stop if approaching limit
       if (Date.now() - scanStart > TIME_LIMIT_MS) {
-        scanLogger.warn({ scanId, reposScanned }, "scan: approaching time limit, stopping early");
+        scanLogger.warn({ scanId, reposScanned }, "scan: time limit reached");
         break;
       }
 
@@ -216,11 +415,13 @@ export async function runScan(scanId: string, workspaceId: string) {
           .eq("id", scanId);
       }
 
+      const repoPhiContext = envFileCache[repo.full_name]
+        ? detectsPhiContext(envFileCache[repo.full_name])
+        : false;
+
       for (const pattern of AGENT_PATTERNS) {
-        // Time valve check inside inner loop too
         if (Date.now() - scanStart > TIME_LIMIT_MS) break;
 
-        // GitHub search rate limit: 30 req/min — 2s between requests is safe
         await sleep(2000);
 
         try {
@@ -287,6 +488,9 @@ export async function runScan(scanId: string, workspaceId: string) {
                   ? Math.floor((Date.now() - new Date(lastCommitDate).getTime()) / 86400000)
                   : null;
 
+                const isProto = isPrototypePath(item.path);
+                const phiCtx = repoPhiContext || detectsPhiContext(content);
+
                 foundAgents.push({
                   name: item.name,
                   repo: repo.full_name,
@@ -299,6 +503,9 @@ export async function runScan(scanId: string, workspaceId: string) {
                   agent_type: pattern.label,
                   services: extractServices(content),
                   has_secrets: detectSecrets(content),
+                  is_prototype: isProto,
+                  phi_context: phiCtx,
+                  tier: pattern.tier,
                 });
               }
             } catch {
@@ -314,20 +521,15 @@ export async function runScan(scanId: string, workspaceId: string) {
       }
     }
 
-    scanLogger.info({ scanId, foundAgents: foundAgents.length, reposScanned }, "scan: classifying agents");
+    scanLogger.info({ scanId, foundAgents: foundAgents.length, reposScanned }, "scan: classifying");
 
-    await adminClient
-      .from("scans")
-      .update({
-        status: "classifying",
-        repos_scanned: reposScanned,
-        agents_found: foundAgents.length,
-      })
-      .eq("id", scanId);
+    await adminClient.from("scans").update({
+      status: "classifying",
+      repos_scanned: reposScanned,
+      agents_found: foundAgents.length,
+    }).eq("id", scanId);
 
-    // Classify sequentially (not parallel) to avoid OpenAI rate limits at scale
-    for (let i = 0; i < foundAgents.length; i++) {
-      const agent = foundAgents[i];
+    for (const agent of foundAgents) {
       const classification = await classifyAgent(agent);
 
       const insert = {
@@ -362,15 +564,12 @@ export async function runScan(scanId: string, workspaceId: string) {
 
     scanLogger.info({ scanId, workspaceId, agentsFound: foundAgents.length }, "scan: completed");
 
-    await adminClient
-      .from("scans")
-      .update({
-        status: "completed",
-        repos_scanned: reposScanned,
-        agents_found: foundAgents.length,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", scanId);
+    await adminClient.from("scans").update({
+      status: "completed",
+      repos_scanned: reposScanned,
+      agents_found: foundAgents.length,
+      completed_at: new Date().toISOString(),
+    }).eq("id", scanId);
 
     await adminClient
       .from("workspaces")
