@@ -9,14 +9,23 @@ export const dynamic = "force-dynamic";
  * Called by Vercel cron (vercel.json) or external uptime monitor.
  * Protected by INTERNAL_API_KEY.
  */
+// Vercel cron calls GET with no auth (runs in Vercel's trusted infra)
+// External callers must use POST with x-internal-key
+export async function GET() {
+  return handleCleanup();
+}
+
 export async function POST(req: NextRequest) {
-  // Accept either internal key or Vercel cron token
   const key = req.headers.get("x-internal-key") ||
     req.headers.get("authorization")?.replace("Bearer ", "");
   const validKey = process.env.INTERNAL_API_KEY;
   if (!key || key !== validKey) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  return handleCleanup();
+}
+
+async function handleCleanup() {
 
   // Mark scans stuck >10 minutes as failed
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();

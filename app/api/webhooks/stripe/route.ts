@@ -8,10 +8,6 @@ export const runtime = "nodejs";
 // Stripe needs raw body for signature verification — disable auto body parsing
 export const dynamic = "force-dynamic";
 
-// In-memory idempotency cache (prevents duplicate processing on webhook retries)
-// Replace with Redis SET NX in high-scale production
-const processedEvents = new Set<string>();
-
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -39,8 +35,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Idempotency: skip if already processed
-  if (processedEvents.has(event.id)) {
+  // Persistent idempotency: check DB before processing (survives restarts)
+  const { data: existing } = await adminClient
+    .from("stripe_events")
+    .select("id")
+    .eq("id", event.id)
+    .maybeSingle();
+
+  if (existing) {
     stripeLogger.info({ eventId: event.id, type: event.type }, "webhook: duplicate, skipping");
     return NextResponse.json({ received: true });
   }
@@ -117,13 +119,15 @@ export async function POST(req: NextRequest) {
         stripeLogger.info({ type: event.type }, "webhook: unhandled event type");
     }
 
-    // Mark as processed after successful handling
-    processedEvents.add(event.id);
-    // Cap cache size to prevent memory leak
-    if (processedEvents.size > 10_000) {
-      const first = processedEvents.values().next().value;
-      if (first) processedEvents.delete(first);
-    }
+    // Mark as processed in DB — persistent across restarts
+    const workspaceId = (event.data.object as { metadata?: { workspace_id?: string } })
+      ?.metadata?.workspace_id ?? null;
+    await adminClient.from("stripe_events").upsert({
+      id: event.id,
+      type: event.type,
+      workspace_id: workspaceId,
+      processed_at: new Date().toISOString(),
+    }, { onConflict: "id", ignoreDuplicates: true });
 
     return NextResponse.json({ received: true });
   } catch (err) {
