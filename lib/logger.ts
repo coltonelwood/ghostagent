@@ -26,6 +26,7 @@ const logger = isEdge
     });
 
 export default logger;
+export { logger };
 
 // Scoped child loggers for each domain
 export const apiLogger = logger.child({ module: "api" });

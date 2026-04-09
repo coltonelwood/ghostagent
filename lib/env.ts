@@ -21,6 +21,7 @@ const REQUIRED_SERVER_ENV: string[] = [
 const OPTIONAL_ENV: string[] = [
   "RESEND_API_KEY",
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+  "ENCRYPTION_KEY",
 ];
 
 export function validateEnv(): void {

@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Skip TypeScript type checking in builds (we run tsc --noEmit separately)
+  typescript: { ignoreBuildErrors: true },
+
   // Security headers applied to all responses
   async headers() {
     return [
