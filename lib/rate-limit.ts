@@ -85,12 +85,33 @@ export const authRateLimiter = new RateLimiter({
   max: 10,                   // 10 auth attempts per 15 min per IP
 });
 
+export const inviteRateLimiter = new RateLimiter({
+  name: "invite",
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,                   // 20 invites/hour per org (prevents invite spam)
+});
+
+export const syncRateLimiter = new RateLimiter({
+  name: "sync",
+  windowMs: 5 * 60 * 1000,  // 5 minutes
+  max: 1,                    // 1 manual sync per connector per 5 min
+});
+
+export const exportRateLimiter = new RateLimiter({
+  name: "export",
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,                   // 10 report exports/hour per user
+});
+
 // Auto-purge every 10 minutes to prevent memory growth
 if (typeof setInterval !== "undefined") {
   setInterval(() => {
     scanRateLimiter.purge();
     apiRateLimiter.purge();
     authRateLimiter.purge();
+    inviteRateLimiter.purge();
+    syncRateLimiter.purge();
+    exportRateLimiter.purge();
   }, 10 * 60 * 1000);
 }
 

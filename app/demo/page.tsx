@@ -5,69 +5,84 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 const DEMO_AGENTS = [
   {
-    name: "billing-reconciler",
-    repo: "acme-corp/payments-service",
-    file_path: "agents/billing_reconciler.py",
+    name: "claims-fraud-scorer",
+    repo: "acme-corp/claims-engine",
+    file_path: ".env.example",
     status: "ghost",
-    risk_level: "high",
-    description: "Processes overdue invoice reminders and triggers Stripe payment retries automatically.",
-    owner_email: "james.wu@acme.com",
-    owner_github: "jameswu",
-    days_since_commit: 142,
-    services: ["stripe", "postgres", "sendgrid"],
-    has_secrets: true,
-  },
-  {
-    name: "customer-onboarding-agent",
-    repo: "acme-corp/crm-tools",
-    file_path: "src/agents/onboarding.ts",
-    status: "active",
-    risk_level: "medium",
-    description: "Sends welcome email sequences to new trial users via SendGrid and logs activity to HubSpot.",
-    owner_email: "sarah.kim@acme.com",
-    owner_github: "sarahkim",
-    days_since_commit: 8,
-    services: ["sendgrid", "hubspot"],
-    has_secrets: false,
-  },
-  {
-    name: "data-sync-prod",
-    repo: "acme-corp/integrations",
-    file_path: "sync/data_sync_prod.py",
-    status: "orphaned",
-    risk_level: "high",
-    description: "Syncs customer records between MongoDB and Salesforce on a daily schedule.",
+    risk_level: "critical",
+    description: "ML scoring service (claims-fraud-v3) scores every claim submission for fraud. Confidence threshold: 0.85.",
+    why_flagged: "Your team is running a fraud detection ML model in production with no documented owner or model card. If this model has drift or bias, claims are being silently approved or rejected with no human review.",
     owner_email: null,
     owner_github: null,
-    days_since_commit: 999,
-    services: ["mongodb", "salesforce"],
+    days_since_commit: 247,
+    services: ["postgres", "openai"],
     has_secrets: false,
+    compliance_tags: ["HIPAA", "SOC2"],
+    confidence_score: 94,
   },
   {
-    name: "support-ticket-classifier",
-    repo: "acme-corp/support",
-    file_path: "agents/classifier.ts",
-    status: "active",
-    risk_level: "low",
-    description: "Classifies incoming support tickets and assigns priority labels using GPT-4o.",
-    owner_email: "miguel.torres@acme.com",
-    owner_github: "mtorres",
-    days_since_commit: 3,
+    name: "chat-server.ts",
+    repo: "acme-corp/platform",
+    file_path: "experiments/prototype-chat/chat-server.ts",
+    status: "ghost",
+    risk_level: "critical",
+    description: "Patient-provider WebSocket chat server. No authentication. Messages stored in-memory only. No HIPAA audit log.",
+    why_flagged: "This prototype handles patient messages with no auth, no audit trail, and no persistence. If it ever ran against real patient data, it\'s a reportable HIPAA breach. Original author may have left the company.",
+    owner_email: "ajiang@acme.com",
+    owner_github: "ajiang",
+    days_since_commit: 189,
     services: [],
     has_secrets: false,
+    compliance_tags: ["HIPAA"],
+    confidence_score: 97,
   },
   {
-    name: "invoice-generator-v2",
-    repo: "acme-corp/billing",
-    file_path: "scripts/invoice_gen_v2.py",
-    status: "ghost",
+    name: "ai-coding-suggestions",
+    repo: "acme-corp/platform",
+    file_path: "experiments/feature-flags/flag-config.json",
+    status: "active",
     risk_level: "high",
-    description: "Generates and sends PDF invoices via Stripe, posts confirmation to Slack channel.",
-    owner_email: "priya.nair@acme.com",
-    owner_github: "pnair",
-    days_since_commit: 67,
-    services: ["stripe", "slack"],
-    has_secrets: true,
+    description: "AI-powered ICD-10 and CPT billing code suggestions. Active at 20% rollout. Fine-tuned model. No human review gate.",
+    why_flagged: "An AI system is actively suggesting billing codes to providers. Wrong codes mean fraudulent billing — even if unintentional. No accuracy benchmark is documented and no human review is required before submission.",
+    owner_email: "schen@acme.com",
+    owner_github: "schen",
+    days_since_commit: 91,
+    services: [],
+    has_secrets: false,
+    compliance_tags: ["HIPAA", "SOC2"],
+    confidence_score: 88,
+  },
+  {
+    name: "nlu-triage",
+    repo: "acme-corp/ml-services",
+    file_path: "ml/nlu-triage/requirements.txt",
+    status: "active",
+    risk_level: "critical",
+    description: "Fine-tuned Bio_ClinicalBERT model classifying urgency of patient messages. Runs as a FastAPI service.",
+    why_flagged: "A clinical NLP model is processing patient messages and categorizing them by urgency. The original author (@achen) may have left. If this model misclassifies an urgent message and a patient is harmed, there is no named owner accountable.",
+    owner_email: "achen@acme.com",
+    owner_github: "achen",
+    days_since_commit: 203,
+    services: ["postgres"],
+    has_secrets: false,
+    compliance_tags: ["HIPAA", "EU_AI_ACT"],
+    confidence_score: 96,
+  },
+  {
+    name: "run-anomaly-detection.ts",
+    repo: "acme-corp/claims-engine",
+    file_path: "cron/weekly/run-anomaly-detection.ts",
+    status: "active",
+    risk_level: "high",
+    description: "Weekly cron job that runs ML-based anomaly detection on all claims. Checks upcoding, duplicate billing, unusual volumes.",
+    why_flagged: "This AI system makes compliance decisions autonomously every Sunday. The owner is noted only in a code comment — if James Liu left, there is no accountable owner for a system that triggers compliance alerts.",
+    owner_email: "jliu@acme.com",
+    owner_github: "jliu",
+    days_since_commit: 74,
+    services: ["postgres", "slack", "sendgrid"],
+    has_secrets: false,
+    compliance_tags: ["SOC2"],
+    confidence_score: 91,
   },
 ];
 
@@ -90,14 +105,17 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function RiskBadge({ level }: { level: string }) {
-  if (level === "high") return <Badge className="bg-red-900/50 text-red-400 border-red-700 border text-xs">HIGH RISK</Badge>;
-  if (level === "medium") return <Badge className="bg-yellow-900/50 text-yellow-400 border-yellow-700 border text-xs">MEDIUM RISK</Badge>;
+  if (level === "critical") return <Badge className="bg-red-600/50 text-red-200 border-red-500 border text-xs font-bold">🔴 CRITICAL</Badge>;
+  if (level === "high") return <Badge className="bg-red-900/50 text-red-400 border-red-700 border text-xs">🟠 HIGH RISK</Badge>;
+  if (level === "medium") return <Badge className="bg-yellow-900/50 text-yellow-400 border-yellow-700 border text-xs">🟡 MEDIUM RISK</Badge>;
   return <Badge className="bg-gray-800 text-gray-400 border-gray-700 border text-xs">LOW RISK</Badge>;
 }
 
 export default function DemoPage() {
+  const critical = DEMO_AGENTS.filter((a) => a.risk_level === "critical").length;
   const ghosts = DEMO_AGENTS.filter((a) => a.status === "ghost").length;
-  const highRisk = DEMO_AGENTS.filter((a) => a.risk_level === "high").length;
+  const highRisk = DEMO_AGENTS.filter((a) => a.risk_level === "high" || a.risk_level === "critical").length;
+  const hipaa = DEMO_AGENTS.filter((a) => (a.compliance_tags ?? []).includes("HIPAA")).length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -118,10 +136,10 @@ export default function DemoPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Agents Found", value: DEMO_AGENTS.length, color: "text-white" },
-            { label: "Ghost Agents", value: ghosts, color: "text-red-400" },
-            { label: "High Risk", value: highRisk, color: "text-red-400" },
-            { label: "Repos Scanned", value: 18, color: "text-gray-400" },
+            { label: "AI Assets Found", value: DEMO_AGENTS.length, color: "text-white" },
+            { label: "Critical Risk", value: critical, color: "text-red-400" },
+            { label: "HIPAA Exposure", value: hipaa, color: "text-red-400" },
+            { label: "Unowned Assets", value: ghosts, color: "text-yellow-400" },
           ].map((stat) => (
             <Card key={stat.label} className="bg-gray-900 border-gray-800">
               <CardContent className="p-4 text-center">
@@ -133,8 +151,7 @@ export default function DemoPage() {
         </div>
 
         <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 text-red-300 text-sm">
-          ⚠️ <strong>2 ghost agents detected</strong> — these are actively running with no living owner. 
-          One is connected to your Stripe API.
+          🚨 <strong>{critical} critical AI systems detected</strong> — including a clinical NLP model processing patient messages with no accountable owner, and a fraud detection ML model with no model card or accuracy documentation. {hipaa} findings have HIPAA exposure.
         </div>
 
         {/* Agent cards */}
@@ -168,7 +185,30 @@ export default function DemoPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
-                <p className="text-gray-300 text-sm">{agent.description}</p>
+                <p className="text-gray-400 text-xs">{agent.description}</p>
+
+                {/* Why This Matters — plain English for decision makers */}
+                {'why_flagged' in agent && agent.why_flagged && (
+                  <div className="bg-red-950/40 border border-red-800/40 rounded p-3">
+                    <p className="text-red-300 text-xs leading-relaxed">
+                      <span className="font-semibold text-red-200">Why this matters: </span>
+                      {agent.why_flagged as string}
+                    </p>
+                  </div>
+                )}
+
+                {/* Compliance tags */}
+                {'compliance_tags' in agent && (agent.compliance_tags as string[]).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-gray-500 text-xs">Compliance:</span>
+                    {(agent.compliance_tags as string[]).map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 rounded text-xs border bg-red-950/40 text-red-300 border-red-700/40">{tag}</span>
+                    ))}
+                    {'confidence_score' in agent && (
+                      <span className="text-gray-500 text-xs ml-auto">{agent.confidence_score as number}% confidence</span>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   {agent.owner_email ? (

@@ -34,10 +34,15 @@ export async function POST(req: NextRequest) {
   if (invite.accepted_at) return NextResponse.json({ error: "Already accepted" }, { status: 410 });
   if (new Date(invite.expires_at) < new Date()) return NextResponse.json({ error: "Invitation has expired" }, { status: 410 });
 
-  // Check email matches (soft check — user might have a different email)
-  // We allow it but log it
+  // Enforce email match: the invitation was issued to a specific address.
+  // A different user accepting it is a privilege escalation.
+  // Allow case-insensitive match only.
   if (invite.email.toLowerCase() !== (user.email ?? "").toLowerCase()) {
-    logger.warn({ inviteEmail: invite.email, userEmail: user.email }, "invite: email mismatch");
+    logger.warn({ inviteEmail: invite.email, userEmail: user.email }, "invite: email mismatch — rejected");
+    return NextResponse.json(
+      { error: "This invitation was sent to a different email address. Please sign in with the correct account." },
+      { status: 403 }
+    );
   }
 
   // Check if already a member

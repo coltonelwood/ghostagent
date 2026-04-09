@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { logPrivescAttempt } from "@/lib/logger";
 
 export type OrgRole = "owner" | "admin" | "operator" | "viewer";
 
@@ -63,6 +64,13 @@ export async function requireRole(
 }> {
   const auth = await requireAuth();
   if (!hasRole(auth.role, minRole)) {
+    logPrivescAttempt({
+      userId: auth.userId,
+      orgId: auth.orgId,
+      required: minRole,
+      actual: auth.role,
+      path: "requireRole",
+    });
     throw new AuthError(
       `Requires ${minRole} role or higher. You have ${auth.role}.`,
       403,

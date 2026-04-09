@@ -3,6 +3,7 @@ import type { NexusConnector } from "./base";
 import { detectAIServices, isAIRelated, buildNormalizedAsset } from "./base";
 import { withRetry } from "../retry";
 import { logger } from "../logger";
+import { validateUrl } from "../ssrf-guard";
 
 export class GitLabConnector implements NexusConnector {
   kind = "gitlab" as const;
@@ -12,7 +13,10 @@ export class GitLabConnector implements NexusConnector {
   icon = "gitlab";
 
   private getBase(credentials: Record<string, string>): string {
-    return (credentials.baseUrl || "https://gitlab.com").replace(/\/$/, "");
+    const url = credentials.baseUrl || "https://gitlab.com";
+    // SSRF guard: validate before use
+    validateUrl(url, "gitlab");
+    return url.replace(/\/$/, "");
   }
 
   async validate(credentials: Record<string, string>) {

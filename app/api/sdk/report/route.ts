@@ -47,11 +47,32 @@ export async function POST(req: NextRequest) {
       metadata?: Record<string, unknown>;
     };
 
-    if (!body.name) {
-      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (!body.name || typeof body.name !== "string") {
+      return NextResponse.json({ error: "name is required and must be a string" }, { status: 400 });
+    }
+    if (body.name.length > 256) {
+      return NextResponse.json({ error: "name must be 256 characters or fewer" }, { status: 400 });
+    }
+    if (body.description && typeof body.description === "string" && body.description.length > 1000) {
+      return NextResponse.json({ error: "description must be 1000 characters or fewer" }, { status: 400 });
+    }
+    if (body.services && !Array.isArray(body.services)) {
+      return NextResponse.json({ error: "services must be an array" }, { status: 400 });
+    }
+    if (Array.isArray(body.services) && body.services.length > 50) {
+      return NextResponse.json({ error: "services array must have 50 or fewer items" }, { status: 400 });
+    }
+    // Strip metadata to prevent large payloads or injected keys
+    const safeMetadata: Record<string, unknown> = {};
+    if (body.metadata && typeof body.metadata === "object") {
+      for (const [k, v] of Object.entries(body.metadata).slice(0, 20)) {
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+          safeMetadata[k.slice(0, 64)] = v;
+        }
+      }
     }
 
-    const externalId = `sdk:${body.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+    const externalId = `sdk:${body.name.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 128)}`;
     const aiServices = (body.services ?? []).map((s) => ({ provider: s }));
 
     // Find or create SDK connector

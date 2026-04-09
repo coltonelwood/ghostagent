@@ -3,7 +3,7 @@ import { withLogging } from "@/lib/api-handler";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { requireRole, AuthError } from "@/lib/org-auth";
 import { syncConnector } from "@/lib/sync-orchestrator";
-import { apiRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { apiRateLimiter, syncRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,15 @@ export const POST = withLogging(
         return NextResponse.json(
           { error: "Rate limit exceeded" },
           { status: 429, headers: rateLimitHeaders(rl.remaining, rl.resetAt) },
+        );
+      }
+
+      // Per-connector sync throttle: max 1 manual sync per 5 minutes
+      const syncRl = syncRateLimiter.check(id); // keyed on connector ID, not user
+      if (!syncRl.allowed) {
+        return NextResponse.json(
+          { error: "This connector was synced recently. Please wait before syncing again." },
+          { status: 429, headers: rateLimitHeaders(syncRl.remaining, syncRl.resetAt) },
         );
       }
 

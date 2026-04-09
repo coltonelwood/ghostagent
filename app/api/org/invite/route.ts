@@ -7,6 +7,7 @@ import { emitEvent } from "@/lib/event-system";
 import { auditLog } from "@/lib/audit";
 import { withLogging } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
+import { inviteRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,15 @@ export const POST = withLogging(async (req: NextRequest) => {
 
   const org = await getOrCreateOrgForUser(user.id, user.email!);
   await requireOrgMember(user.id, org.id, "admin");
+
+  // Rate limit: max 20 invites/hour per org
+  const rl = inviteRateLimiter.check(org.id);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many invitations sent recently. Please wait before sending more." },
+      { status: 429, headers: rateLimitHeaders(rl.remaining, rl.resetAt) }
+    );
+  }
 
   const db = getAdminClient();
   const body = await req.json() as { email: string; role: string };

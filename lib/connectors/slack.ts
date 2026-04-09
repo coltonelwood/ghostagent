@@ -5,6 +5,7 @@
 import type { Connector, SyncResult } from "../types/platform";
 import type { NexusConnector } from "./base";
 import { logger } from "../logger";
+import { validateSlackWebhookUrl, SSRFError } from "../ssrf-guard";
 
 export class SlackConnector implements NexusConnector {
   kind = "slack" as const;
@@ -16,8 +17,9 @@ export class SlackConnector implements NexusConnector {
   async validate(credentials: Record<string, string>) {
     try {
       const url = credentials.webhook_url;
-      if (!url || !url.startsWith("https://hooks.slack.com/")) {
-        return { valid: false, error: "Invalid Slack webhook URL." };
+      if (!url) return { valid: false, error: "webhook_url is required" };
+      try { validateSlackWebhookUrl(url); } catch (e) {
+        return { valid: false, error: e instanceof SSRFError ? e.message : "Invalid webhook URL" };
       }
 
       const res = await fetch(url, {

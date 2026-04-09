@@ -2,6 +2,7 @@ import type { Connector, SyncResult } from "../types/platform";
 import type { NexusConnector } from "./base";
 import { detectAIServices, buildNormalizedAsset } from "./base";
 import { logger } from "../logger";
+import { validateUrl, SSRFError } from "../ssrf-guard";
 
 const AI_NODE_PATTERNS = /langchain|openai|claude|anthropic|gemini|mistral|cohere|ai\./i;
 
@@ -18,6 +19,7 @@ export class N8nConnector implements NexusConnector {
 
   async validate(credentials: Record<string, string>) {
     try {
+      validateUrl(credentials.instanceUrl, "n8n"); // SSRF guard
       const base = credentials.instanceUrl.replace(/\/$/, "");
       const res = await fetch(`${base}/api/v1/workflows?limit=1`, {
         headers: this.getHeaders(credentials),
@@ -30,6 +32,9 @@ export class N8nConnector implements NexusConnector {
   }
 
   async sync(_connector: Connector, credentials: Record<string, string>): Promise<SyncResult> {
+    try { validateUrl(credentials.instanceUrl, "n8n"); } catch (e) {
+      return { assets: [], errors: [{ resource: "n8n", message: String(e), recoverable: false }], metadata: { service: "n8n", error: "ssrf_blocked" } };
+    }
     const base = credentials.instanceUrl.replace(/\/$/, "");
     const headers = this.getHeaders(credentials);
     const assets = [];
