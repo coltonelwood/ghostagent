@@ -1,6 +1,8 @@
 import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
 import { adminClient } from "@/lib/supabase/admin";
+import { scanLogger } from "@/lib/logger";
+import { withRetry, sleep } from "@/lib/retry";
 
 let _openai: OpenAI | null = null;
 function getOpenAI() {
@@ -144,7 +146,12 @@ export async function runScan(scanId: string, workspaceId: string) {
     return;
   }
 
-  const octokit = new Octokit({ auth: workspace.github_token });
+  const octokit = new Octokit({
+    auth: workspace.github_token,
+    request: { timeout: 30_000 }, // 30s timeout per request
+  });
+
+  scanLogger.info({ scanId, workspaceId, org: workspace.github_org }, "scan: starting");
 
   // Update scan status
   await adminClient
@@ -153,12 +160,17 @@ export async function runScan(scanId: string, workspaceId: string) {
     .eq("id", scanId);
 
   try {
-    // Get all repos in the org
-    const repos = await octokit.paginate(octokit.repos.listForOrg, {
-      org: workspace.github_org,
-      per_page: 100,
-      type: "all",
-    });
+    // Get all repos — retry on transient failures
+    const repos = await withRetry(
+      () => octokit.paginate(octokit.repos.listForOrg, {
+        org: workspace.github_org,
+        per_page: 100,
+        type: "all",
+      }),
+      { label: `listForOrg(${workspace.github_org})`, maxAttempts: 3 }
+    );
+
+    scanLogger.info({ scanId, repoCount: repos.length }, "scan: repos fetched");
 
     const foundAgents: FoundAgent[] = [];
     let reposScanned = 0;
@@ -177,14 +189,27 @@ export async function runScan(scanId: string, workspaceId: string) {
       // Search for agent patterns in this repo
       for (const pattern of AGENT_PATTERNS) {
         try {
-          // Add delay between search requests to avoid GitHub search rate limits
           // GitHub search API: 30 requests/min for authenticated users
-          await new Promise((r) => setTimeout(r, 2100));
+          // 2.1s delay = safe headroom under the limit
+          await sleep(2100);
 
-          const searchResult = await octokit.search.code({
-            q: `${pattern.query} repo:${repo.full_name}`,
-            per_page: 10,
-          });
+          const searchResult = await withRetry(
+            () => octokit.search.code({
+              q: `${pattern.query} repo:${repo.full_name}`,
+              per_page: 10,
+            }),
+            {
+              label: `search(${pattern.query} in ${repo.full_name})`,
+              maxAttempts: 3,
+              baseDelayMs: 5000, // longer base delay for search rate limits
+              shouldRetry: (err) => {
+                const status = (err as { status?: number })?.status;
+                // Retry on rate limit and server errors only
+                return status === 429 || status === 503 || status === 504 ||
+                  String(err).includes("secondary rate limit");
+              },
+            }
+          );
 
           for (const item of searchResult.data.items) {
             // Skip node_modules, vendor, etc.
@@ -264,11 +289,16 @@ export async function runScan(scanId: string, workspaceId: string) {
               // Skip files we can't read
             }
           }
-        } catch {
-          // Rate limit or search error — continue
+        } catch (err) {
+          scanLogger.warn(
+            { scanId, repo: repo.full_name, pattern: pattern.query, err: String(err) },
+            "scan: search error, continuing"
+          );
         }
       }
     }
+
+    scanLogger.info({ scanId, foundAgents: foundAgents.length, reposScanned }, "scan: classifying agents");
 
     // Classify agents with OpenAI
     await adminClient
@@ -280,7 +310,7 @@ export async function runScan(scanId: string, workspaceId: string) {
       })
       .eq("id", scanId);
 
-    // Process in batches of 5
+    // Process in batches of 5 with retry
     for (let i = 0; i < foundAgents.length; i += 5) {
       const batch = foundAgents.slice(i, i + 5);
       const classified = await Promise.all(batch.map(classifyAgent));
@@ -303,7 +333,17 @@ export async function runScan(scanId: string, workspaceId: string) {
         has_secrets: agent.has_secrets,
       }));
 
-      await adminClient.from("agents").insert(inserts);
+      await withRetry(
+        async () => {
+          const r = await adminClient.from("agents")
+            .upsert(inserts, {
+              onConflict: "scan_id,repo,file_path",
+              ignoreDuplicates: true,
+            });
+          if (r.error) throw r.error;
+        },
+        { label: "agents.upsert", maxAttempts: 3 }
+      );
     }
 
     // Mark scan complete
@@ -317,6 +357,8 @@ export async function runScan(scanId: string, workspaceId: string) {
       })
       .eq("id", scanId);
 
+    scanLogger.info({ scanId, workspaceId, agentsFound: foundAgents.length }, "scan: completed");
+
     // Increment workspace scan count
     await adminClient
       .from("workspaces")
@@ -324,6 +366,8 @@ export async function runScan(scanId: string, workspaceId: string) {
       .eq("id", workspaceId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    const stack = error instanceof Error ? error.stack : undefined;
+    scanLogger.error({ scanId, workspaceId, message, stack }, "scan: failed");
     await adminClient
       .from("scans")
       .update({ status: "failed", error_message: message })

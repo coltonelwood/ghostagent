@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { apiRateLimiter } from "@/lib/rate-limit";
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient();
@@ -10,6 +11,10 @@ export async function PATCH(req: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!apiRateLimiter.check(user.id)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": "60" } });
   }
 
   let body: { name?: unknown; github_org?: unknown; github_token?: unknown };
