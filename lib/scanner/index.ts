@@ -43,6 +43,21 @@ const AGENT_PATTERNS = [
   { query: "ANOMALY_THRESHOLD",              label: "ML Agent",        tier: 5 },
   { query: "fraud_model",                    label: "ML Agent",        tier: 5 },
   { query: "claims-fraud",                   label: "ML Agent",        tier: 5 },
+  // Tier 6: Python ML models (requirements.txt / model files)
+  { query: "transformers torch",             label: "ML Model",        tier: 6 },
+  { query: "Bio_ClinicalBERT",              label: "Clinical NLP",    tier: 6 },
+  { query: "mlflow",                         label: "ML Model",        tier: 6 },
+  { query: "readmission",                    label: "Clinical ML",     tier: 6 },
+  { query: "patient_similarity",             label: "Clinical ML",     tier: 6 },
+  { query: "model.predict",                  label: "ML Model",        tier: 6 },
+  { query: "torch.load",                     label: "ML Model",        tier: 6 },
+  { query: "SentenceTransformer",            label: "Embeddings",      tier: 6 },
+  { query: "openai.embeddings",              label: "Embeddings",      tier: 1 },
+  { query: "text-embedding-ada",             label: "Embeddings",      tier: 1 },
+  // Tier 7: JSON feature flag files with AI flags
+  { query: "ai-coding-suggestions",          label: "AI Feature Flag", tier: 3 },
+  { query: "ai_claim_review",                label: "AI Feature Flag", tier: 3 },
+  { query: "enable_ai_suggestions",          label: "AI Feature Flag", tier: 3 },
 ];
 
 const SERVICE_PATTERNS: Record<string, RegExp> = {
@@ -103,8 +118,22 @@ function detectSecrets(content: string): boolean {
   return patterns.some((p) => p.test(content));
 }
 
+// Paths that are experiments/prototypes but NOT AI-related
+const NON_AI_EXPERIMENT_SIGNALS = [
+  /\/perf-benchmarks\//i,
+  /\/ab-tests\//i,
+  /\/load-test/i,
+  /\/benchmark/i,
+  /\/feature-flags\/(?!.*ai)/i, // feature flags that don't mention AI
+];
+
 function isPrototypePath(filePath: string): boolean {
-  return PROTOTYPE_PATH_SIGNALS.some((p) => p.test(filePath));
+  // Must match a prototype signal
+  if (!PROTOTYPE_PATH_SIGNALS.some((p) => p.test(filePath))) return false;
+  // Must NOT be a generic non-AI experiment (perf benchmarks, A/B tests, etc.)
+  // Exception: if the content itself has AI keywords, the caller should still flag it
+  if (NON_AI_EXPERIMENT_SIGNALS.some((p) => p.test(filePath))) return false;
+  return true;
 }
 
 function detectsPhiContext(content: string): boolean {
@@ -397,6 +426,51 @@ export async function runScan(scanId: string, workspaceId: string) {
         }
       } catch {
         // No .env.example in this repo — fine
+      }
+
+      // Also scan feature flag JSON files for AI-related flags
+      const flagFilePaths = [
+        "experiments/feature-flags/flag-config.json",
+        "config/feature-flags/flags.json",
+        "feature-flags.json",
+        "flags.json",
+      ];
+      for (const flagPath of flagFilePaths) {
+        try {
+          const flagFile = await octokit.repos.getContent({
+            owner: workspace.github_org,
+            repo: repo.name,
+            path: flagPath,
+          });
+          if ("content" in flagFile.data && flagFile.data.content) {
+            const content = Buffer.from(flagFile.data.content, "base64").toString("utf-8");
+            // Look for AI-related flags by name
+            const aiFlags = content.match(/"(ai[-_][^"]+|[^"]*[-_]ai[^"]*|[^"]*llm[^"]*|[^"]*ml[-_][^"]*)"/gi) ?? [];
+            for (const flagMatch of aiFlags) {
+              const flagName = flagMatch.replace(/"/g, "");
+              // Skip non-flag JSON keys (description, notes, etc.)
+              if (["description", "notes", "type", "seed", "property", "operator", "value"].includes(flagName)) continue;
+              foundAgents.push({
+                name: flagName,
+                repo: repo.full_name,
+                file_path: flagPath,
+                content: `AI feature flag: "${flagName}"\n\nFull flag config:\n${content.slice(0, 2000)}`,
+                owner_github: null,
+                owner_email: null,
+                last_commit_at: null,
+                days_since_commit: null,
+                agent_type: "AI Feature Flag",
+                services: [],
+                has_secrets: false,
+                is_prototype: flagPath.startsWith("experiments/"),
+                phi_context: envFileCache[repo.full_name] ? detectsPhiContext(envFileCache[repo.full_name]) : false,
+                tier: 3,
+              });
+            }
+          }
+        } catch {
+          // Flag file doesn't exist in this repo
+        }
       }
     }
 
