@@ -230,32 +230,83 @@ export function CommandCenterDashboard({
 }: {
   analytics: AnalyticsData | null;
 }) {
-  if (!analytics) {
+  if (!analytics || analytics.totalAssets === 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Command Center</h1>
-          <p className="text-muted-foreground">
-            Welcome to Nexus. Connect your first data source to start
-            discovering AI assets.
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">Your AI asset landscape will appear here once you connect a source.</p>
         </div>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Database className="mx-auto size-10 text-muted-foreground" />
-            <h3 className="mt-4 text-lg font-semibold">No data yet</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Head to{" "}
+
+        {/* Onboarding steps */}
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            {
+              step: "1",
+              title: "Connect a source",
+              desc: "Link GitHub, AWS, GitLab, or an automation platform. Credentials are encrypted end-to-end.",
+              href: "/platform/connectors",
+              cta: "Add connector →",
+              active: true,
+            },
+            {
+              step: "2",
+              title: "Run your first sync",
+              desc: "Nexus will scan your connected sources and surface every AI asset it finds.",
+              href: "/platform/connectors",
+              cta: "Connect first →",
+              active: false,
+            },
+            {
+              step: "3",
+              title: "Review your inventory",
+              desc: "Every asset gets a risk score, owner, and compliance tag. Set policies to enforce governance automatically.",
+              href: "/platform/assets",
+              cta: "View registry →",
+              active: false,
+            },
+          ].map((item) => (
+            <div key={item.step} className={`rounded-xl border p-6 space-y-3 ${
+              item.active ? "border-violet-200 bg-violet-50/30" : "bg-muted/20"
+            }`}>
+              <div className={`text-xs font-bold uppercase tracking-wider ${
+                item.active ? "text-violet-600" : "text-muted-foreground"
+              }`}>Step {item.step}</div>
+              <h3 className="font-semibold">{item.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
               <a
-                href="/platform/connectors"
-                className="text-primary underline underline-offset-4"
+                href={item.href}
+                className={`inline-block text-sm font-medium transition-colors ${
+                  item.active
+                    ? "text-violet-600 hover:text-violet-700"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                Connectors
-              </a>{" "}
-              to connect your first data source.
-            </p>
-          </CardContent>
-        </Card>
+                {item.cta}
+              </a>
+            </div>
+          ))}
+        </div>
+
+        {/* Supported sources */}
+        <div className="rounded-xl border bg-card p-6">
+          <h3 className="text-sm font-semibold mb-4">Supported sources</h3>
+          <div className="flex flex-wrap gap-3">
+            {[
+              { name: "GitHub", icon: "🐙" },
+              { name: "GitLab", icon: "🦊" },
+              { name: "AWS", icon: "☁️" },
+              { name: "Zapier", icon: "⚡" },
+              { name: "n8n", icon: "🔄" },
+              { name: "BambooHR", icon: "🌿" },
+              { name: "Rippling", icon: "👥" },
+            ].map((s) => (
+              <span key={s.name} className="flex items-center gap-1.5 text-sm text-muted-foreground border rounded-lg px-3 py-1.5">
+                {s.icon} {s.name}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -263,9 +314,9 @@ export function CommandCenterDashboard({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Command Center</h1>
-        <p className="text-muted-foreground">
-          Real-time overview of your AI asset landscape.
+        <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          AI asset risk posture across your connected sources.
         </p>
       </div>
 

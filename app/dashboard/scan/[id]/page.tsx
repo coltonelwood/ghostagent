@@ -43,10 +43,10 @@ export default async function ScanDetailPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Scan {id.slice(0, 8)}
+            Scan results
           </h1>
-          <p className="text-muted-foreground">
-            Started {new Date(scan.started_at).toLocaleString()}
+          <p className="text-muted-foreground text-sm">
+            {new Date(scan.started_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
         <Badge
@@ -60,17 +60,26 @@ export default async function ScanDetailPage({
       {isRunning && <ScanProgress scanId={id} />}
 
       {scan.status === "failed" && (
-        <Card className="border-destructive">
+        <Card className="border-destructive/50 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-destructive">Scan Failed</CardTitle>
+            <CardTitle className="text-destructive text-base">Scan could not complete</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {scan.error_message ?? "An unexpected error occurred."}
+              {scan.error_message === "GitHub not configured"
+                ? "No GitHub organization is configured. Add your GitHub org and access token in Settings, then try again."
+                : scan.error_message ?? "An unexpected error occurred. Please try running the scan again."}
             </p>
-            <Link href="/dashboard">
-              <Button variant="outline" size="sm">Run a new scan →</Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/dashboard">
+                <Button variant="outline" size="sm">Back to dashboard</Button>
+              </Link>
+              {scan.error_message === "GitHub not configured" && (
+                <Link href="/dashboard/settings">
+                  <Button size="sm">Configure GitHub</Button>
+                </Link>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
