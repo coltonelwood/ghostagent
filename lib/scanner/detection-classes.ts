@@ -63,13 +63,14 @@ export const LLM_PATTERNS: DetectionPattern[] = [
   { query: "ChatOpenAI",                label: "LangChain/OpenAI",    class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
   { query: "langchain",                 label: "LangChain",           class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
   { query: "AgentExecutor",             label: "LangChain Agent",     class: "LLM_INTEGRATION", tier: 1, riskFloor: "high" },
-  { query: "anthropic",                 label: "Anthropic Claude",    class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
+  { query: "@anthropic-ai/sdk",          label: "Anthropic Claude",    class: "LLM_INTEGRATION", tier: 1, phiCritical: true }, // package import — high precision
+  { query: "Anthropic({apiKey",           label: "Anthropic Claude",    class: "LLM_INTEGRATION", tier: 1, phiCritical: true }, // SDK instantiation
   { query: "crewai",                    label: "CrewAI Agent",        class: "LLM_INTEGRATION", tier: 1, riskFloor: "high" },
   { query: "openai.embeddings",         label: "OpenAI Embeddings",   class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
   { query: "text-embedding-ada",        label: "OpenAI Embeddings",   class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
   { query: "from openai import",        label: "OpenAI Python SDK",   class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
   { query: "import anthropic",          label: "Anthropic Python",    class: "LLM_INTEGRATION", tier: 1, phiCritical: true },
-  { query: "groq",                      label: "Groq LLM",            class: "LLM_INTEGRATION", tier: 2 },
+  { query: "Groq({apiKey",              label: "Groq LLM",            class: "LLM_INTEGRATION", tier: 2 }, // SDK instantiation only — avoids SQL 'groq' FP
   { query: "mistralai",                 label: "Mistral AI",          class: "LLM_INTEGRATION", tier: 2 },
   { query: "together.ai",               label: "Together AI",         class: "LLM_INTEGRATION", tier: 2 },
   { query: "cohere.generate",           label: "Cohere",              class: "LLM_INTEGRATION", tier: 2 },
@@ -85,7 +86,7 @@ export const ML_SERVICE_PATTERNS: DetectionPattern[] = [
   { query: "ML_MODEL_VERSION",          label: "ML Service",          class: "ML_SERVICE", tier: 2, riskFloor: "high" },
   { query: "ML_CONFIDENCE_THRESHOLD",   label: "ML Service",          class: "ML_SERVICE", tier: 2, riskFloor: "high" },
   { query: "inference_endpoint",        label: "ML Inference",        class: "ML_SERVICE", tier: 2, riskFloor: "high" },
-  { query: "scoring_service",           label: "ML Scoring",          class: "ML_SERVICE", tier: 2, riskFloor: "high" },
+  // 'scoring_service' removed — too generic, matches non-AI code
   { query: "model_serving",             label: "ML Serving",          class: "ML_SERVICE", tier: 2, riskFloor: "high" },
   { query: "triton_client",             label: "NVIDIA Triton",       class: "ML_SERVICE", tier: 2, riskFloor: "high" },
   { query: "seldon",                    label: "Seldon ML",           class: "ML_SERVICE", tier: 2 },
@@ -97,11 +98,11 @@ export const ML_SERVICE_PATTERNS: DetectionPattern[] = [
 // ─── TIER 3: PYTHON ML MODELS ─────────────────────────────────────────────
 export const ML_MODEL_PATTERNS: DetectionPattern[] = [
   { query: "transformers torch",        label: "HuggingFace Model",   class: "ML_MODEL", tier: 3, riskFloor: "high" },
-  { query: "torch.load",                label: "PyTorch Model",       class: "ML_MODEL", tier: 3 },
-  { query: "model.predict",             label: "ML Model",            class: "ML_MODEL", tier: 3 },
+  { query: "torch.load(",               label: "PyTorch Model",       class: "ML_MODEL", tier: 3 }, // paren reduces FP vs docs
+  { query: ".predict(X",                label: "ML Model",            class: "ML_MODEL", tier: 3 }, // sklearn-style call — more specific
   { query: "mlflow",                    label: "MLflow Tracking",     class: "ML_MODEL", tier: 3 },
   { query: "SentenceTransformer",       label: "Sentence Embeddings", class: "ML_MODEL", tier: 3, phiCritical: true },
-  { query: "sklearn.pipeline",          label: "Scikit-learn Pipeline",class: "ML_MODEL", tier: 4 },
+  { query: "sklearn.pipeline.Pipeline", label: "Scikit-learn Pipeline",class: "ML_MODEL", tier: 4 }, // full import path, not a word
   { query: "xgboost",                   label: "XGBoost Model",       class: "ML_MODEL", tier: 4 },
   { query: "lightgbm",                  label: "LightGBM Model",      class: "ML_MODEL", tier: 4 },
   { query: "wandb",                     label: "Weights & Biases",    class: "MODEL_INTEGRITY", tier: 4 },
@@ -118,7 +119,7 @@ export const CLINICAL_AI_PATTERNS: DetectionPattern[] = [
   { query: "icd10 prediction",          label: "ICD-10 Coding AI",    class: "CLINICAL_AI", tier: 2, riskFloor: "high",     phiCritical: true },
   { query: "cpt_suggestion",            label: "CPT Suggestion AI",   class: "CLINICAL_AI", tier: 2, riskFloor: "high",     phiCritical: true },
   { query: "medical_nlp",               label: "Medical NLP",         class: "CLINICAL_AI", tier: 3, riskFloor: "high",     phiCritical: true },
-  { query: "clinical_notes",            label: "Clinical Notes AI",   class: "CLINICAL_AI", tier: 3, riskFloor: "high",     phiCritical: true },
+  { query: "clinical_notes_embedding",  label: "Clinical Notes AI",   class: "CLINICAL_AI", tier: 3, riskFloor: "high", phiCritical: true }, // 'clinical_notes' alone too generic
   { query: "ehr_extraction",            label: "EHR Extraction AI",   class: "CLINICAL_AI", tier: 3, riskFloor: "high",     phiCritical: true },
   { query: "nlu_triage",                label: "NLU Triage Model",    class: "CLINICAL_AI", tier: 2, riskFloor: "critical", phiCritical: true },
 ];
@@ -150,7 +151,8 @@ export const DOCUMENT_AI_PATTERNS: DetectionPattern[] = [
 
 // ─── TIER 7: AUTOMATION AGENTS / CRON AI ─────────────────────────────────
 export const AUTOMATION_PATTERNS: DetectionPattern[] = [
-  { query: "anomaly_detection",         label: "Anomaly Detection",   class: "AUTOMATION_AGENT", tier: 3, riskFloor: "high" },
+  { query: "run-anomaly-detection",     label: "Anomaly Detection",   class: "AUTOMATION_AGENT", tier: 3, riskFloor: "high" }, // file/script name pattern
+  { query: "AnomalyDetector",            label: "Anomaly Detection",   class: "AUTOMATION_AGENT", tier: 3, riskFloor: "high" }, // class name pattern
   { query: "ANOMALY_THRESHOLD",         label: "Anomaly Detection",   class: "AUTOMATION_AGENT", tier: 3, riskFloor: "high" },
   { query: "fraud_model",               label: "Fraud Detection",     class: "AUTOMATION_AGENT", tier: 2, riskFloor: "high" },
   { query: "claims-fraud",              label: "Claims Fraud AI",     class: "AUTOMATION_AGENT", tier: 2, riskFloor: "high" },

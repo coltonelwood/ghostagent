@@ -38,6 +38,10 @@ export interface Agent {
   description: string | null;
   risk_level: "critical" | "high" | "medium" | "low";
   risk_reason: string | null;
+  why_flagged: string | null;        // plain-English explanation for non-technical readers
+  confidence_score: number | null;  // 0-100: how confident is the scanner in this finding
+  detection_class: string | null;   // which detection class triggered this
+  compliance_tags: string[];        // e.g. ["HIPAA", "SOC2"]
   services: string[];
   has_secrets: boolean;
   status: "active" | "acknowledged" | "decommissioned";

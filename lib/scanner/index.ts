@@ -194,13 +194,19 @@ async function classifyAgent(
   agent: FoundAgent,
   pattern: DetectionPattern,
   boostMap: Map<string, number>,
-): Promise<{ risk_level: string; risk_reason: string; description: string; compliance_tags: string[] }> {
+): Promise<{ risk_level: string; risk_reason: string; why_flagged: string; description: string; compliance_tags: string[]; confidence_score: number }> {
   const { floor, escalationReasons } = computeBaseRisk(agent, pattern, boostMap);
 
   const escalationNote = escalationReasons.length > 0
     ? `\n\nPRE-COMPUTED RISK ESCALATIONS (enforce these — do not downgrade below "${floor}"):\n` +
       escalationReasons.map((r) => `• ${r}`).join("\n")
     : "";
+
+  const ownerStatus = agent.owner_github
+    ? (agent.days_since_commit !== null && agent.days_since_commit > 90)
+      ? `${agent.owner_github} (last active ${agent.days_since_commit} days ago — may have left)`
+      : agent.owner_github
+    : "No owner found";
 
   const prompt = `You are a security and compliance analyst specializing in AI governance.
 Classify this AI asset found in a GitHub organization.
@@ -209,30 +215,31 @@ Detection class: ${agent.detection_class}
 Asset type: ${agent.agent_type}
 File: ${agent.file_path}
 Repository: ${agent.repo}
-Last commit by: ${agent.owner_github ?? "UNKNOWN"}
-Days since last commit: ${agent.days_since_commit ?? "UNKNOWN"}
-External services connected: ${agent.services.join(", ") || "none detected"}
-Hardcoded secrets present: ${agent.has_secrets}
-In prototype/experiment directory: ${agent.is_prototype}
-PHI/HIPAA environment signals: ${agent.phi_context}
+Owner: ${ownerStatus}
+External services connected: ${agent.services.join(", ") || "none"}
+Hardcoded secrets: ${agent.has_secrets}
+Prototype/experiment code: ${agent.is_prototype}
+PHI/HIPAA environment: ${agent.phi_context}
 ${escalationNote}
 
 Code snippet (first 2000 chars):
 ${agent.content.slice(0, 2000)}
 
-Respond ONLY in JSON with these exact fields:
+Respond ONLY in JSON:
 {
   "risk_level": "critical" | "high" | "medium" | "low",
-  "risk_reason": "one sentence — the most important risk, specific to this asset",
-  "description": "one sentence — what this asset does",
-  "compliance_tags": ["HIPAA", "SOC2", "EU_AI_ACT", "ISO42001"] — applicable tags only
+  "risk_reason": "ONE sentence — the single most actionable risk. Be specific: name the file, the owner, the regulation.",
+  "why_flagged": "ONE sentence in plain English for a non-technical reader — why should they care about this? What could go wrong?",
+  "description": "ONE sentence — what this AI system actually does",
+  "compliance_tags": ["HIPAA" | "SOC2" | "EU_AI_ACT" | "ISO42001"] — only include regulations that directly apply,
+  "confidence_score": 0-100 — how confident are you this is a real AI governance risk (not a false positive)?
 }
 
 Risk level rules (STRICT — never downgrade below "${floor}"):
-- critical: secrets present, LLM+PHI, unauth prototype with patient data, autonomous approval without human review, owner gone >180 days
-- high: custom ML service, clinical AI system, owner gone >90 days, multi-service AI agent
-- medium: AI feature flag (disabled), basic automation, well-documented owner
-- low: simple scripts, recently maintained, no PHI exposure`;
+- critical: secrets, LLM+PHI, unauth prototype with real data, autonomous decisions without human review, owner departed >180 days
+- high: custom ML in production, clinical AI, owner dormant >90 days, multi-service agent
+- medium: disabled AI flag, well-owned automation
+- low: recently maintained, no PHI, clear ownership`;
 
   try {
     const response = await withRetry(
@@ -268,20 +275,38 @@ Risk level rules (STRICT — never downgrade below "${floor}"):
       .slice(0, 3) // max 3 reasons
       .join(" | ");
 
+    const confidence = typeof result.confidence_score === "number"
+      ? Math.min(100, Math.max(0, result.confidence_score))
+      : tier1Confidence(agent, pattern);
+
     return {
       risk_level: finalLevel,
       risk_reason: allReasons.slice(0, 600),
+      why_flagged: (result.why_flagged ?? result.risk_reason ?? "").slice(0, 400),
       description: result.description ?? `${agent.agent_type} detected`,
       compliance_tags: Array.isArray(result.compliance_tags) ? result.compliance_tags : [],
+      confidence_score: confidence,
     };
   } catch {
     return {
       risk_level: floor,
-      risk_reason: escalationReasons.join(" | ") || "Classified by heuristic",
-      description: `${agent.agent_type} in ${agent.repo}`,
+      risk_reason: escalationReasons.join(" | ") || "Classified by heuristic (GPT unavailable)",
+      why_flagged: `An AI system was detected in your codebase that requires review. ${escalationReasons[0] ?? ""}`,
+      description: `${agent.agent_type} detected in ${agent.repo}`,
       compliance_tags: agent.phi_context ? ["HIPAA"] : [],
+      confidence_score: tier1Confidence(agent, pattern),
     };
   }
+}
+
+/** Heuristic confidence without GPT — based on tier + signals */
+function tier1Confidence(agent: FoundAgent, pattern: DetectionPattern): number {
+  let score = 90 - (pattern.tier - 1) * 12; // tier 1 = 90, tier 4 = 54
+  if (agent.phi_context) score = Math.min(100, score + 10);
+  if (agent.has_secrets) score = Math.min(100, score + 10);
+  if (agent.is_prototype) score += 5;
+  if (agent.signal_score > 0.5) score = Math.min(100, score + 8);
+  return Math.max(30, Math.min(100, Math.round(score)));
 }
 
 // ─── MAIN SCAN ────────────────────────────────────────────────────────────
@@ -490,9 +515,13 @@ export async function runScan(scanId: string, workspaceId: string) {
         last_commit_at: agent.last_commit_at,
         days_since_commit: agent.days_since_commit,
         agent_type: agent.agent_type,
+        detection_class: agent.detection_class,
         description: classification.description,
         risk_level: classification.risk_level,
         risk_reason: classification.risk_reason,
+        why_flagged: classification.why_flagged,
+        confidence_score: classification.confidence_score,
+        compliance_tags: classification.compliance_tags,
         services: agent.services,
         has_secrets: agent.has_secrets,
       };
