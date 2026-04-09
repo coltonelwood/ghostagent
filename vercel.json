@@ -8,6 +8,9 @@
     },
     "app/api/internal/cleanup/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/internal/sync-schedule/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [

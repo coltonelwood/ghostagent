@@ -11,7 +11,15 @@ export const dynamic = "force-dynamic";
  */
 // Vercel cron calls GET with no auth (runs in Vercel's trusted infra)
 // External callers must use POST with x-internal-key
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Verify Vercel cron secret if configured (Vercel Pro sends Authorization: Bearer <CRON_SECRET>)
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
   return handleCleanup();
 }
 

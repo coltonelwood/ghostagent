@@ -84,7 +84,8 @@ export const POST = withLogging(async (req: NextRequest) => {
 
   // Send invitation email via Resend
   if (process.env.RESEND_API_KEY && invitation?.token) {
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite?token=${invitation.token}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://nexus.ai';
+    const inviteUrl = `${appUrl}/invite?token=${invitation.token}`;
     const html = `<div style="font-family:sans-serif;max-width:600px">
       <h2 style="color:#0f172a">You've been invited to join ${org.name} on Nexus</h2>
       <p>${user.email} has invited you to join their AI governance workspace as a <strong>${body.role}</strong>.</p>

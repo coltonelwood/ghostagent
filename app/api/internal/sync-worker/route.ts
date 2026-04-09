@@ -8,7 +8,14 @@ export const maxDuration = 300;
  * GET handler for Vercel Cron.
  * Vercel cron jobs call GET — no auth needed (Vercel handles it).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
   try {
     logger.info("sync-worker: cron triggered — syncing all due connectors");
     await syncAllDueConnectors();

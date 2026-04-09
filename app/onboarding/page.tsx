@@ -46,7 +46,7 @@ export default function OnboardingPage() {
     setOrgError("");
     try {
       const res = await fetch("/api/org", {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: orgName }),
       });
@@ -105,7 +105,7 @@ export default function OnboardingPage() {
     setInviteError("");
     try {
       for (const email of validEmails) {
-        const res = await fetch("/api/org/members", {
+        const res = await fetch("/api/org/invite", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim(), role: inviteRole }),

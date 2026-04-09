@@ -213,9 +213,12 @@ export default function ConnectorSetupPage({
       if (testRes.ok && testData.success) {
         setTestResult({ status: "success", message: "Connection verified!" });
       } else {
+        // Test failed — clean up the orphaned connector record so it doesn't litter the DB
+        await fetch(`/api/connectors/${connector.id}`, { method: "DELETE" }).catch(() => {});
+        setConnectorId(null);
         setTestResult({
           status: "error",
-          message: testData.error ?? "Connection test failed",
+          message: testData.error ?? "Connection test failed. Please check your credentials.",
         });
       }
     } catch {

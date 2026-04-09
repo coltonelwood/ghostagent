@@ -56,7 +56,7 @@ export async function PATCH(
       .from("compliance_mappings")
       .upsert({
         org_id: org.id,
-        asset_id: "00000000-0000-0000-0000-000000000000", // sentinel: org-level mapping
+        asset_id: null, // org-level assessment (no specific asset)
         framework_id: fw.id,
         control_id: controlId,
         status: body.status,
