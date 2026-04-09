@@ -99,16 +99,16 @@ const SERVICE_COLORS: Record<string, string> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "ghost") return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 border">👻 GHOST</Badge>;
-  if (status === "orphaned") return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 border">⚠️ ORPHANED</Badge>;
-  return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border">✅ ACTIVE</Badge>;
+  if (status === "ghost") return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 border text-xs">Unowned</Badge>;
+  if (status === "orphaned") return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 border text-xs">Owner departed</Badge>;
+  return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 border text-xs">Active</Badge>;
 }
 
 function RiskBadge({ level }: { level: string }) {
-  if (level === "critical") return <Badge className="bg-red-600/50 text-red-200 border-red-500 border text-xs font-bold">🔴 CRITICAL</Badge>;
-  if (level === "high") return <Badge className="bg-red-900/50 text-red-400 border-red-700 border text-xs">🟠 HIGH RISK</Badge>;
-  if (level === "medium") return <Badge className="bg-yellow-900/50 text-yellow-400 border-yellow-700 border text-xs">🟡 MEDIUM RISK</Badge>;
-  return <Badge className="bg-gray-800 text-gray-400 border-gray-700 border text-xs">LOW RISK</Badge>;
+  if (level === "critical") return <Badge className="bg-red-600/50 text-red-200 border-red-500 border text-xs font-semibold">Critical</Badge>;
+  if (level === "high") return <Badge className="bg-orange-900/50 text-orange-300 border-orange-700 border text-xs">High</Badge>;
+  if (level === "medium") return <Badge className="bg-yellow-900/50 text-yellow-400 border-yellow-700 border text-xs">Medium</Badge>;
+  return <Badge className="bg-gray-800 text-gray-400 border-gray-700 border text-xs">Low</Badge>;
 }
 
 export default function DemoPage() {
@@ -122,9 +122,12 @@ export default function DemoPage() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gray-900/50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xl font-bold">
-            <span>👻</span> GhostAgent
-            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 border text-xs ml-2">DEMO</Badge>
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-600">
+              <span className="text-xs font-bold text-white">N</span>
+            </div>
+            <span className="text-base font-semibold">Nexus</span>
+            <span className="text-xs font-medium text-white/40 border border-white/10 rounded-full px-2 py-0.5">demo</span>
           </div>
           <Link href="/login">
             <Button size="sm">Scan Your Org Free →</Button>
@@ -151,7 +154,7 @@ export default function DemoPage() {
         </div>
 
         <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 text-red-300 text-sm">
-          🚨 <strong>{critical} critical AI systems detected</strong> — including a clinical NLP model processing patient messages with no accountable owner, and a fraud detection ML model with no model card or accuracy documentation. {hipaa} findings have HIPAA exposure.
+          <strong>{critical} critical findings</strong> — includes a clinical NLP model processing patient messages with no accountable owner, and a production ML model with no documented accuracy baseline. {hipaa} findings involve HIPAA-covered data.
         </div>
 
         {/* Agent cards */}
@@ -220,7 +223,7 @@ export default function DemoPage() {
                       </span>
                     </span>
                   ) : (
-                    <span className="text-yellow-400">⚠️ No identifiable owner</span>
+                    <span className="text-yellow-400">No owner on record</span>
                   )}
                 </div>
 

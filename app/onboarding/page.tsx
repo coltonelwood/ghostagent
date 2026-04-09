@@ -152,8 +152,8 @@ export default function OnboardingPage() {
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
             <span className="text-primary-foreground font-bold text-sm">N</span>
           </div>
-          <h1 className="text-2xl font-bold">Welcome to Nexus</h1>
-          <p className="text-muted-foreground mt-1">Set up your AI governance platform in a few steps</p>
+          <h1 className="text-2xl font-bold">Let&apos;s get you set up</h1>
+          <p className="text-muted-foreground mt-1">Takes about 3 minutes. You can add more sources any time.</p>
         </div>
 
         {/* Progress dots */}
@@ -189,7 +189,7 @@ export default function OnboardingPage() {
         {step === 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Create Your Organization</CardTitle>
+              <CardTitle>Name your organization</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle>Connect Your First Data Source</CardTitle>
+              <CardTitle>Connect your first source</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -309,7 +309,7 @@ export default function OnboardingPage() {
         {step === 2 && (
           <Card>
             <CardHeader>
-              <CardTitle>Invite Your Team</CardTitle>
+              <CardTitle>Invite your team</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">

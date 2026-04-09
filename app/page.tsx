@@ -4,65 +4,65 @@ import { Button } from "@/components/ui/button";
 // ─── DATA ──────────────────────────────────────────────────────────────────
 
 const CONNECTORS = [
-  { name: "GitHub",     icon: "🐙", category: "Code",       live: true  },
-  { name: "GitLab",     icon: "🦊", category: "Code",       live: true  },
-  { name: "AWS",        icon: "☁️", category: "Cloud",      live: true  },
-  { name: "Azure",      icon: "🔷", category: "Cloud",      live: false },
-  { name: "GCP",        icon: "🌐", category: "Cloud",      live: false },
-  { name: "Zapier",     icon: "⚡", category: "Automation", live: true  },
-  { name: "n8n",        icon: "🔄", category: "Automation", live: true  },
-  { name: "Make",       icon: "🔧", category: "Automation", live: false },
-  { name: "BambooHR",   icon: "🌿", category: "HR",         live: true  },
-  { name: "Rippling",   icon: "👥", category: "HR",         live: true  },
-  { name: "Workday",    icon: "📋", category: "HR",         live: false },
-  { name: "Bitbucket",  icon: "🪣", category: "Code",       live: false },
+  { name: "GitHub",    abbr: "GH",  category: "Code",       live: true  },
+  { name: "GitLab",    abbr: "GL",  category: "Code",       live: true  },
+  { name: "AWS",       abbr: "AWS", category: "Cloud",      live: true  },
+  { name: "Azure",     abbr: "AZ",  category: "Cloud",      live: false },
+  { name: "GCP",       abbr: "GCP", category: "Cloud",      live: false },
+  { name: "Zapier",    abbr: "ZAP", category: "Automation", live: true  },
+  { name: "n8n",       abbr: "n8n", category: "Automation", live: true  },
+  { name: "Make",      abbr: "MK",  category: "Automation", live: false },
+  { name: "BambooHR",  abbr: "BHR", category: "HR",         live: true  },
+  { name: "Rippling",  abbr: "RP",  category: "HR",         live: true  },
+  { name: "Workday",   abbr: "WD",  category: "HR",         live: false },
+  { name: "Bitbucket", abbr: "BB",  category: "Code",       live: false },
 ];
 
 const STEPS = [
   {
     n: "01",
     title: "Connect your sources",
-    body: "One-click integrations with GitHub, GitLab, AWS, Zapier, n8n, and your HR systems. Credentials are AES-256 encrypted at rest.",
+    body: "Link GitHub, GitLab, AWS, Zapier, n8n, and your HR systems in minutes. Every credential is encrypted end-to-end with AES-256-GCM and never stored in plaintext.",
   },
   {
     n: "02",
-    title: "Discover every AI asset",
-    body: "65+ detection patterns surface LLM API calls, ML models, automation workflows, AI feature flags, and internal scoring services - across every connected source.",
+    title: "Surface every AI system",
+    body: "Nexus scans across all connected sources - finding LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services that your team may not know exist.",
   },
   {
     n: "03",
-    title: "Assign ownership automatically",
-    body: "Cross-reference HR data to identify current owners. Flag assets whose creators have left the company. Trigger automated re-ownership workflows.",
+    title: "Identify who owns what",
+    body: "Cross-reference your HR data to find current owners. When engineers leave, their AI systems are automatically flagged as unowned and escalated to the right team.",
   },
   {
     n: "04",
-    title: "Enforce governance policy",
-    body: "Create rules like 'all production AI must have an active owner' or 'no LLM may process PHI without a BAA.' Violations create tasks, trigger alerts, and feed audit logs.",
+    title: "Set rules. Get alerted. Stay covered.",
+    body: "Define ownership requirements, PHI handling rules, and risk thresholds. When something violates a rule, Nexus creates a task, sends an alert, and logs it for audit review.",
   },
 ];
 
 const FRAMEWORKS = [
-  { name: "HIPAA",       icon: "⚕️",  desc: "PHI exposure detection. Flags LLM integrations processing patient data without documented Business Associate Agreements." },
-  { name: "SOC 2",       icon: "🛡️",  desc: "AI system inventory for Type II audits. Maps to CC6.6, CC7.1, CC7.2, CC8.1, and availability controls." },
-  { name: "EU AI Act",   icon: "🇪🇺",  desc: "Risk categorization, human oversight documentation, and technical documentation requirements for high-risk AI systems." },
-  { name: "ISO 42001",   icon: "📋",  desc: "AI Management System controls. Governance policies, risk assessment, impact evaluation, and corrective action tracking." },
+  { name: "HIPAA",     abbr: "H",   color: "bg-red-900/40 text-red-300",    desc: "PHI exposure detection. Flags LLM integrations processing patient data without a documented Business Associate Agreement." },
+  { name: "SOC 2",    abbr: "S2",  color: "bg-blue-900/40 text-blue-300",   desc: "AI system inventory for Type II audits. Maps findings to CC6.6, CC7.1, CC7.2, CC8.1, and A1.2 availability controls." },
+  { name: "EU AI Act",abbr: "EU",  color: "bg-violet-900/40 text-violet-300",desc: "Risk categorization, human oversight documentation, and technical documentation for high-risk AI systems (Articles 9–17)." },
+  { name: "ISO 42001",abbr: "ISO", color: "bg-indigo-900/40 text-indigo-300",desc: "AI Management System controls: governance policies, risk assessment procedures, impact evaluation, and corrective action tracking." },
 ];
 
 const TESTIMONIALS = [
   {
-    quote: "We connected Nexus to our GitHub org and found 14 AI integrations nobody had documented. Three of them were processing customer PII with no owner after two engineers left.",
+    quote: "First scan found 14 AI integrations we had no record of. Three were actively processing customer data with no owner - their authors had left the company months earlier.",
     name: "VP of Engineering",
-    co: "Series B Fintech",
+    co: "Series B fintech, 180 engineers",
   },
   {
-    quote: "Our SOC 2 auditor asked for an AI system inventory. Nexus gave us a complete report with ownership, risk scores, and compliance gaps in under an hour.",
+    quote: "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Nexus, had a complete report in 40 minutes, and passed the audit.",
     name: "Head of Security",
-    co: "Healthcare SaaS",
+    co: "Healthcare SaaS, 120 employees",
   },
   {
-    quote: "We were building this internally. Then we saw Nexus. It would have taken us six months to get to feature parity. We signed up the same day.",
-    name: "CTO",
-    co: "Legal Tech Platform",
+    quote: "We had a spreadsheet. It was always out of date. Now Nexus just updates it automatically whenever a new AI integration gets pushed.",
+    name: "Engineering Manager",
+    co: "Legal tech platform, 90 engineers",
   },
 ];
 
@@ -212,11 +212,11 @@ export default function LandingPage() {
       <div className="border-y border-white/[0.06] bg-white/[0.015]">
         <div className="mx-auto max-w-5xl px-6 py-5 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
           {[
-            { v: "65+", l: "AI detection patterns" },
             { v: "10+", l: "Source connectors" },
             { v: "4",   l: "Compliance frameworks" },
-            { v: "< 10 min", l: "Time to first scan" },
-            { v: "AES-256", l: "Credential encryption" },
+            { v: "< 10 min", l: "First scan to results" },
+            { v: "0",   l: "Plaintext credentials stored" },
+            { v: "HIPAA", l: "PHI exposure detection" },
           ].map((s) => (
             <div key={s.l} className="flex items-center gap-3">
               <span className="text-xl font-bold text-white">{s.v}</span>
@@ -242,28 +242,31 @@ export default function LandingPage() {
         <div className="mt-14 grid sm:grid-cols-3 gap-5">
           {[
             {
-              icon: "👻",
-              label: "Critical",
-              title: "Ghost AI agents",
-              body: "Autonomous scripts still running in production - connected to your APIs, customer data, and payment systems - with no identifiable owner. They don't appear in any inventory.",
+              dot: "bg-red-500",
+              label: "Risk: Critical",
+              labelColor: "text-red-400 bg-red-400/10 border-red-400/20",
+              title: "Unowned AI agents",
+              body: "Scripts and services still running in production — connected to your APIs, customer data, and payment systems — with no owner on record. They don\'t appear in any inventory.",
             },
             {
-              icon: "⚕️",
-              label: "Critical",
-              title: "Undetected PHI exposure",
-              body: "LLM integrations quietly processing patient records, health claims, or sensitive data - without documented BAAs, without security review, and without compliance team awareness.",
+              dot: "bg-red-500",
+              label: "Risk: Critical",
+              labelColor: "text-red-400 bg-red-400/10 border-red-400/20",
+              title: "Silent PHI exposure",
+              body: "LLM integrations processing patient records or health data without documented oversight. No BAA. No security review. No record that the system exists.",
             },
             {
-              icon: "📋",
-              label: "High",
-              title: "Audit gaps",
-              body: "SOC 2, EU AI Act, and ISO 42001 auditors now require a full AI system inventory. Most engineering organizations can't produce one - and most compliance teams don't know to ask.",
+              dot: "bg-orange-400",
+              label: "Risk: High",
+              labelColor: "text-orange-400 bg-orange-400/10 border-orange-400/20",
+              title: "Compliance gaps",
+              body: "SOC 2, EU AI Act, and ISO 42001 auditors now require a complete AI system inventory. Most engineering teams can\'t produce one. Most compliance teams don\'t know to ask.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-7 hover:border-white/[0.12] transition-colors">
               <div className="flex items-start justify-between mb-5">
-                <span className="text-3xl">{item.icon}</span>
-                <span className="text-xs font-semibold text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded-full">{item.label}</span>
+                <div className={`h-2.5 w-2.5 rounded-full mt-1 ${item.dot}`} />
+                <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${item.labelColor}`}>{item.label}</span>
               </div>
               <h3 className="font-semibold text-white mb-2">{item.title}</h3>
               <p className="text-sm text-white/45 leading-relaxed">{item.body}</p>
@@ -275,12 +278,12 @@ export default function LandingPage() {
       {/* ── PLATFORM ────────────────────────────────────────────────────── */}
       <section id="platform" className="border-y border-white/[0.06] bg-white/[0.015]">
         <div className="mx-auto max-w-5xl px-6 py-28">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">The platform</div>
+          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">How it works</div>
           <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-            Full lifecycle AI governance.
+            Four steps to knowing what's running.
           </h2>
           <p className="mt-5 text-lg text-white/50 max-w-2xl">
-            From first detection to continuous compliance - Nexus manages the entire governance lifecycle for every AI system in your organization.
+            Most teams go from zero visibility to a complete AI asset inventory in under an hour.
           </p>
 
           <div className="mt-16 grid sm:grid-cols-2 gap-5">
@@ -326,7 +329,7 @@ export default function LandingPage() {
                 ? "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14]"
                 : "border-white/[0.04] bg-white/[0.01] opacity-40"
             }`}>
-              <span className="text-2xl">{c.icon}</span>
+              <div className="h-8 w-8 rounded-lg bg-white/[0.07] flex items-center justify-center text-[10px] font-bold text-white/60">{c.abbr}</div>
               <span className="text-xs font-medium text-white/70">{c.name}</span>
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                 c.live
@@ -351,17 +354,17 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-6 py-28">
           <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Compliance</div>
           <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-            Built for the regulations
-            <span className="text-white/30"> your auditors care about.</span>
+            Auditors are asking about AI.
+            <span className="text-white/30"> Now you have answers.</span>
           </h2>
           <p className="mt-5 text-lg text-white/50 max-w-2xl">
-            Every finding Nexus surfaces is mapped to the specific controls and articles required by each framework - not generic security advice.
+            Every finding maps to the specific controls in the frameworks your security team and auditors use. Not generic recommendations — actual evidence.
           </p>
 
           <div className="mt-14 grid sm:grid-cols-2 gap-5">
             {FRAMEWORKS.map((f) => (
               <div key={f.name} className="rounded-2xl border border-white/[0.07] bg-[#0d0d14] p-7 flex gap-5">
-                <span className="text-3xl shrink-0">{f.icon}</span>
+                <div className={`h-10 w-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${f.color}`}>{f.abbr}</div>
                 <div>
                   <h3 className="font-semibold text-white mb-2">{f.name}</h3>
                   <p className="text-sm text-white/45 leading-relaxed">{f.desc}</p>
@@ -388,7 +391,7 @@ export default function LandingPage() {
       {/* ── TESTIMONIALS ────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-5xl px-6 py-28">
         <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">What teams say</div>
-        <h2 className="text-4xl font-bold max-w-xl">The first scan is always surprising.</h2>
+        <h2 className="text-4xl font-bold max-w-xl">The first scan always finds something.</h2>
 
         <div className="mt-14 grid sm:grid-cols-3 gap-5">
           {TESTIMONIALS.map((t) => (
@@ -409,13 +412,13 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
             <div>
               <div className="mb-3 text-sm font-semibold uppercase tracking-widest text-violet-400">Security</div>
-              <h2 className="text-2xl font-bold">Enterprise-grade security, by default.</h2>
+              <h2 className="text-2xl font-bold">Security that holds up to scrutiny.</h2>
               <p className="mt-2 text-white/40 max-w-lg text-sm leading-relaxed">
-                Connector credentials are AES-256-GCM encrypted at rest. All access is scoped to your organization with enforced RBAC. Every sensitive action is audit-logged. We never store raw secrets.
+                Connector credentials are encrypted end-to-end and never logged. All API access is scoped to your organization. Every sensitive action writes an audit trail. We never store secrets in plaintext.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 shrink-0">
-              {["AES-256-GCM encryption", "RBAC + audit logs", "SSRF protection", "CSP headers", "HSTS enforced", "Supabase RLS"].map((s) => (
+              {["AES-256-GCM credentials", "Organization-scoped RBAC", "Full audit trail", "No plaintext secrets", "SSRF protection", "Security headers"].map((s) => (
                 <span key={s} className="text-xs text-white/50 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5">
                   ✓ {s}
                 </span>

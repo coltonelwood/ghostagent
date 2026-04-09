@@ -18,37 +18,37 @@ const REPORTS: ReportMeta[] = [
   {
     id: "executive_summary",
     name: "Executive Summary",
-    description: "Board-ready overview of your AI asset posture, risk distribution, and key metrics",
-    badge: "PDF + JSON",
-    icon: "📊",
+    description: "Asset counts, risk distribution, and open issues — formatted for leadership or board review",
+    badge: "Markdown",
+    icon: "ES",
   },
   {
     id: "risk_report",
-    name: "Risk Assessment Report",
-    description: "Detailed breakdown of all AI assets by risk level, with remediation recommendations",
-    badge: "PDF",
-    icon: "⚠️",
+    name: "Risk Assessment",
+    description: "Every AI asset by risk level. Includes ownership status, days since last review, and connected services",
+    badge: "Markdown",
+    icon: "RA",
   },
   {
     id: "compliance_report",
-    name: "Compliance Report",
-    description: "Full compliance posture across all enabled frameworks",
-    badge: "PDF",
-    icon: "📋",
+    name: "Compliance Summary",
+    description: "Control coverage across HIPAA, SOC 2, EU AI Act, and ISO 42001 — suitable for auditor review",
+    badge: "Markdown",
+    icon: "CS",
   },
   {
     id: "orphaned_assets",
-    name: "Orphaned Assets Report",
-    description: "All AI systems with no active owner, sorted by risk level",
-    badge: "CSV + PDF",
-    icon: "👻",
+    name: "Unowned Assets",
+    description: "All AI systems with no active owner on record, sorted by risk level. Useful for remediation planning",
+    badge: "Markdown",
+    icon: "UA",
   },
   {
     id: "policy_violations",
-    name: "Policy Violations Report",
-    description: "All open policy violations across your organization",
-    badge: "PDF",
-    icon: "🚨",
+    name: "Policy Violations",
+    description: "All open violations across your active policies, with asset details and first detection date",
+    badge: "Markdown",
+    icon: "PV",
   },
 ];
 
@@ -244,7 +244,7 @@ export default function ReportsPage() {
             <Card key={report.id}>
               <CardContent className="pt-5">
                 <div className="flex items-start gap-3 mb-4">
-                  <span className="text-2xl">{report.icon}</span>
+                  <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{report.icon}</div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{report.name}</h3>
