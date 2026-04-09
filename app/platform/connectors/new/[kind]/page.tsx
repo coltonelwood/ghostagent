@@ -279,7 +279,7 @@ export default function ConnectorSetupPage({
       {step === "auth" && (
         <Card>
           <CardHeader>
-            <CardTitle>Enter Credentials</CardTitle>
+            <CardTitle>Add your {definition.displayName} credentials</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
@@ -316,12 +316,11 @@ export default function ConnectorSetupPage({
       {step === "test" && (
         <Card>
           <CardHeader>
-            <CardTitle>Test Connection</CardTitle>
+            <CardTitle>Verify connection to {definition.displayName}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              We will verify that the credentials can connect to{" "}
-              {definition.displayName} successfully.
+              Nexus will attempt a live connection to {definition.displayName} using the credentials you provided. If it fails, nothing will be saved.
             </p>
             {testResult.status === "idle" && (
               <Button onClick={handleTestConnection}>
@@ -379,7 +378,7 @@ export default function ConnectorSetupPage({
       {step === "config" && (
         <Card>
           <CardHeader>
-            <CardTitle>Configuration</CardTitle>
+            <CardTitle>Additional settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {definition.configFields && definition.configFields.length > 0 ? (
@@ -414,7 +413,7 @@ export default function ConnectorSetupPage({
       {step === "save" && (
         <Card>
           <CardHeader>
-            <CardTitle>Save & Start Syncing</CardTitle>
+            <CardTitle>Review and save</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4 space-y-2">
