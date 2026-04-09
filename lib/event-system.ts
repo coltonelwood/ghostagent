@@ -1,6 +1,7 @@
 import { adminClient } from "./supabase/admin";
 import { logger } from "./logger";
 import { withRetry } from "./retry";
+import { validateSlackWebhookUrl, validateWebhookUrl } from "./ssrf-guard";
 import type { EventKind, Severity } from "./types/platform";
 
 // ============================================================
@@ -131,11 +132,22 @@ async function dispatchAlerts(
   const tasks: Promise<void>[] = [];
 
   if (prefs.slack_webhook_url) {
-    tasks.push(dispatchSlack(orgId, eventId, prefs.slack_webhook_url as string, prefs.slack_channel as string | null, kind, severity, title, body));
+    const slackUrl = prefs.slack_webhook_url as string;
+    try {
+      validateSlackWebhookUrl(slackUrl); // Re-validate at dispatch time
+      tasks.push(dispatchSlack(orgId, eventId, slackUrl, prefs.slack_channel as string | null, kind, severity, title, body));
+    } catch {
+      logger.warn({ orgId }, "event-system: skipping invalid slack webhook URL at dispatch");
+    }
   }
 
   for (const url of (prefs.webhook_urls as string[]) ?? []) {
-    tasks.push(dispatchWebhook(orgId, eventId, url, kind, severity, title, body, metadata));
+    try {
+      validateWebhookUrl(url); // Re-validate at dispatch time
+      tasks.push(dispatchWebhook(orgId, eventId, url, kind, severity, title, body, metadata));
+    } catch {
+      logger.warn({ orgId, url: url.slice(0, 40) }, "event-system: skipping invalid webhook URL at dispatch");
+    }
   }
 
   const emailRecipients = (prefs.email_recipients as string[]) ?? [];

@@ -129,7 +129,7 @@ export default function CompliancePage() {
   function downloadReport() {
     const reportData = {
       generated_at: new Date().toISOString(),
-      report_type: "compliance_posture",
+      report_type: "compliance_summary",
       data,
     };
     const blob = new Blob([JSON.stringify(reportData, null, 2)], {
@@ -173,7 +173,7 @@ export default function CompliancePage() {
         <div>
           <h1 className="text-2xl font-bold">Compliance</h1>
           <p className="text-muted-foreground mt-1">
-            Track your AI governance against industry frameworks
+            Review your AI asset inventory against common compliance framework controls
           </p>
         </div>
         <div className="flex gap-2">
@@ -305,9 +305,9 @@ export default function CompliancePage() {
             <div>
               <h3 className="font-semibold">EU AI Act — August 2026 Deadline</h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                The EU AI Act requires documented risk management, transparency, and human
-                oversight for high-risk AI systems. Non-compliance can result in fines up to
-                30M EUR or 6% of global annual turnover.
+                The EU AI Act establishes requirements for documented risk management, transparency, and human
+                oversight for high-risk AI systems. Enforcement for non-compliant systems
+                may include fines up to 30M EUR or 6% of global annual turnover.
               </p>
               <LinkButton href="/platform/compliance/eu_ai_act" size="sm" className="mt-3">
                 Check EU AI Act Readiness

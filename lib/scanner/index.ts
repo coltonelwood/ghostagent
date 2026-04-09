@@ -123,7 +123,7 @@ function computeBaseRisk(agent: FoundAgent, pattern: DetectionPattern, boostMap:
   // Apply PHI-critical rule
   if (pattern.phiCritical && agent.phi_context) {
     level = "critical";
-    reasons.push("AI/ML system processing PHI — potential HIPAA violation. Verify BAA with any third-party AI providers.");
+    reasons.push("AI/ML system in a PHI-related environment — verify whether patient data flows to third-party providers and whether a Business Associate Agreement is in place.");
   }
 
   // Apply all contextual rules
@@ -228,10 +228,10 @@ ${agent.content.slice(0, 2000)}
 Respond ONLY in JSON:
 {
   "risk_level": "critical" | "high" | "medium" | "low",
-  "risk_reason": "ONE sentence — the single most actionable risk. Be specific: name the file, the owner, the regulation.",
-  "why_flagged": "ONE sentence in plain English for a non-technical reader — why should they care about this? What could go wrong?",
-  "description": "ONE sentence — what this AI system actually does",
-  "compliance_tags": ["HIPAA" | "SOC2" | "EU_AI_ACT" | "ISO42001"] — only include regulations that directly apply,
+  "risk_reason": "ONE sentence — the single most actionable concern. Be specific: name the file, the owner, the potential risk area.",
+  "why_flagged": "ONE sentence in plain English for a non-technical reader — what governance gap does this represent and why does it matter?",
+  "description": "ONE sentence — what this AI system does",
+  "compliance_tags": ["HIPAA" | "SOC2" | "EU_AI_ACT" | "ISO42001"] — include frameworks this finding is most relevant to review against,
   "confidence_score": 0-100 — how confident are you this is a real AI governance risk (not a false positive)?
 }
 

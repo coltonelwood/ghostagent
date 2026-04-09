@@ -203,7 +203,7 @@ export const CONTEXTUAL_RULES: ContextualRule[] = [
       phi && ["OpenAI", "LangChain/OpenAI", "Anthropic Claude", "OpenAI Python SDK",
               "OpenAI Embeddings", "Clinical BERT", "NLU Triage Model"].includes(agentType),
     riskFloor: "critical",
-    reason: "LLM integration detected in HIPAA/PHI environment — potential violation of HIPAA §164.308 and §164.312. PHI may be transmitted to third-party AI provider without Business Associate Agreement.",
+    reason: "LLM integration detected in a HIPAA/PHI environment — review whether patient data may be transmitted to a third-party AI provider and whether a Business Associate Agreement is in place.",
   },
   {
     name: "clinical_ai_always_high",
