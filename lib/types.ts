@@ -1,0 +1,44 @@
+export interface Workspace {
+  id: string;
+  owner_id: string;
+  name: string;
+  github_org: string | null;
+  github_token: string | null;
+  stripe_customer_id: string | null;
+  stripe_sub_id: string | null;
+  plan: "trial" | "pro" | "enterprise";
+  scan_count: number;
+  created_at: string;
+}
+
+export interface Scan {
+  id: string;
+  workspace_id: string;
+  status: "pending" | "scanning" | "classifying" | "completed" | "failed";
+  repos_scanned: number;
+  agents_found: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface Agent {
+  id: string;
+  scan_id: string;
+  workspace_id: string;
+  name: string;
+  repo: string;
+  file_path: string;
+  owner_github: string | null;
+  owner_email: string | null;
+  last_commit_at: string | null;
+  days_since_commit: number | null;
+  agent_type: string | null;
+  description: string | null;
+  risk_level: "critical" | "high" | "medium" | "low";
+  risk_reason: string | null;
+  services: string[];
+  has_secrets: boolean;
+  status: "active" | "acknowledged" | "decommissioned";
+  created_at: string;
+}
