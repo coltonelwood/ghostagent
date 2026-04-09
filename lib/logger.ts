@@ -3,11 +3,16 @@ import pino from "pino";
 const isDev = process.env.NODE_ENV === "development";
 const isEdge = typeof process.env.NEXT_RUNTIME === "string" && process.env.NEXT_RUNTIME === "edge";
 
+// Validate log level — pino throws if level is not in its built-in list
+const VALID_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"];
+const rawLevel = process.env.LOG_LEVEL ?? "info";
+const LOG_LEVEL = VALID_LEVELS.includes(rawLevel) ? rawLevel : "info";
+
 // Edge runtime doesn't support pino transports
 const logger = isEdge
   ? pino({ level: "info" })
   : pino({
-      level: process.env.LOG_LEVEL ?? "info",
+      level: LOG_LEVEL,
       ...(isDev
         ? {
             transport: {
