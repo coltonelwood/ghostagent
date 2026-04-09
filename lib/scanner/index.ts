@@ -1,8 +1,40 @@
+/**
+ * scanner/index.ts — GhostAgent / Nexus AI Asset Scanner
+ *
+ * Architecture:
+ *   detection-classes.ts  → all patterns, contextual rules, PHI signals
+ *   learning-engine.ts    → feedback loop, suppression, boost weights
+ *   index.ts (this file)  → GitHub API orchestration + GPT classification
+ *
+ * Adding new detections: edit detection-classes.ts only.
+ * Tuning risk scoring: edit detection-classes.ts CONTEXTUAL_RULES.
+ */
+
 import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
 import { adminClient } from "@/lib/supabase/admin";
 import { scanLogger } from "@/lib/logger";
 import { withRetry, sleep } from "@/lib/retry";
+import {
+  ALL_PATTERNS,
+  CONTENT_SIGNALS,
+  CONTEXTUAL_RULES,
+  PHI_ENV_SIGNALS,
+  PROTOTYPE_PATH_SIGNALS,
+  NON_AI_EXPERIMENT_EXCLUSIONS,
+  FLAG_FILE_PATHS,
+  AI_FLAG_NAME_PATTERN,
+  type DetectionPattern,
+} from "./detection-classes";
+import {
+  getSuppressedPatterns,
+  getPatternBoosts,
+  recordScanMetrics,
+} from "./learning-engine";
+
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+const MAX_REPOS_PER_SCAN = 10;
+const TIME_LIMIT_MS = 4 * 60 * 1000; // 4 min — leaves 60s buffer for Vercel 300s
 
 let _openai: OpenAI | null = null;
 function getOpenAI() {
@@ -10,96 +42,25 @@ function getOpenAI() {
   return _openai;
 }
 
-const MAX_REPOS_PER_SCAN = 10;
-
-// ─── DETECTION PATTERNS ───────────────────────────────────────────────────
-// Tier 1: Direct LLM/agent framework usage
-const AGENT_PATTERNS = [
-  { query: "langchain",                      label: "LangChain",       tier: 1 },
-  { query: "ChatOpenAI",                     label: "LangChain",       tier: 1 },
-  { query: "openai.chat.completions",        label: "OpenAI",          tier: 1 },
-  { query: "anthropic",                      label: "Anthropic",       tier: 1 },
-  { query: "crewai",                         label: "CrewAI",          tier: 1 },
-  { query: "AgentExecutor",                  label: "LangChain",       tier: 1 },
-  // Tier 2: Custom ML services
-  { query: "ML_SCORING_SERVICE_URL",         label: "ML Service",      tier: 2 },
-  { query: "ML_MODEL_VERSION",               label: "ML Service",      tier: 2 },
-  { query: "ML_CONFIDENCE_THRESHOLD",        label: "ML Service",      tier: 2 },
-  { query: "inference_endpoint",             label: "ML Service",      tier: 2 },
-  { query: "model_version",                  label: "ML Service",      tier: 2 },
-  { query: "scoring_service",                label: "ML Service",      tier: 2 },
-  // Tier 3: AI feature flags
-  { query: "FF_AI_",                         label: "AI Feature Flag", tier: 3 },
-  { query: "enable_ai",                      label: "AI Feature Flag", tier: 3 },
-  { query: "ai_enabled",                     label: "AI Feature Flag", tier: 3 },
-  { query: "ai_review",                      label: "AI Feature Flag", tier: 3 },
-  // Tier 4: Document AI / OCR
-  { query: "textract",                       label: "Document AI",     tier: 4 },
-  { query: "ocr_process",                    label: "Document AI",     tier: 4 },
-  { query: "document_intelligence",          label: "Document AI",     tier: 4 },
-  { query: "vision_api",                     label: "Document AI",     tier: 4 },
-  // Tier 5: Anomaly / ML detection scripts
-  { query: "anomaly_detection",              label: "ML Agent",        tier: 5 },
-  { query: "ANOMALY_THRESHOLD",              label: "ML Agent",        tier: 5 },
-  { query: "fraud_model",                    label: "ML Agent",        tier: 5 },
-  { query: "claims-fraud",                   label: "ML Agent",        tier: 5 },
-  // Tier 6: Python ML models (requirements.txt / model files)
-  { query: "transformers torch",             label: "ML Model",        tier: 6 },
-  { query: "Bio_ClinicalBERT",              label: "Clinical NLP",    tier: 6 },
-  { query: "mlflow",                         label: "ML Model",        tier: 6 },
-  { query: "readmission",                    label: "Clinical ML",     tier: 6 },
-  { query: "patient_similarity",             label: "Clinical ML",     tier: 6 },
-  { query: "model.predict",                  label: "ML Model",        tier: 6 },
-  { query: "torch.load",                     label: "ML Model",        tier: 6 },
-  { query: "SentenceTransformer",            label: "Embeddings",      tier: 6 },
-  { query: "openai.embeddings",              label: "Embeddings",      tier: 1 },
-  { query: "text-embedding-ada",             label: "Embeddings",      tier: 1 },
-  // Tier 7: JSON feature flag files with AI flags
-  { query: "ai-coding-suggestions",          label: "AI Feature Flag", tier: 3 },
-  { query: "ai_claim_review",                label: "AI Feature Flag", tier: 3 },
-  { query: "enable_ai_suggestions",          label: "AI Feature Flag", tier: 3 },
-];
-
+// ─── SERVICE DETECTION (what external services does this asset touch?) ────
 const SERVICE_PATTERNS: Record<string, RegExp> = {
-  stripe: /stripe|Stripe/,
-  sendgrid: /sendgrid|SendGrid/,
-  salesforce: /salesforce|sfdc/i,
-  slack: /slack\.com|SlackClient/i,
-  twilio: /twilio/i,
-  hubspot: /hubspot/i,
-  postgres: /postgres|pg\.|psycopg/i,
-  mongodb: /mongodb|MongoClient/i,
-  redis: /redis\.Redis|redisClient/i,
-  aws: /boto3|aws-sdk|@aws-sdk/,
-  gmail: /gmail|smtplib/i,
-  notion: /notion\.so|NotionClient/i,
-  openai: /openai|gpt-4|gpt-3/i,
+  stripe:    /stripe|Stripe/,
+  sendgrid:  /sendgrid|SendGrid/,
+  salesforce:/salesforce|sfdc/i,
+  slack:     /slack\.com|SlackClient/i,
+  twilio:    /twilio/i,
+  hubspot:   /hubspot/i,
+  postgres:  /postgres|pg\.|psycopg/i,
+  mongodb:   /mongodb|MongoClient/i,
+  redis:     /redis\.Redis|redisClient/i,
+  aws:       /boto3|aws-sdk|@aws-sdk/,
+  gmail:     /gmail|smtplib/i,
+  notion:    /notion\.so|NotionClient/i,
+  openai:    /openai|gpt-4|gpt-3/i,
   anthropic: /anthropic|claude/i,
-  bedrock: /bedrock|SageMaker/i,
+  bedrock:   /bedrock|SageMaker/i,
+  hubspot2:  /hubspot/i,
 };
-
-// ─── PHI ENVIRONMENT SIGNALS ─────────────────────────────────────────────
-// If any of these exist in the repo env/config, the repo handles PHI
-const PHI_ENV_SIGNALS = [
-  /HIPAA/i,
-  /hipaa_audit/i,
-  /phi_/i,
-  /hl7|fhir/i,
-  /epic_client|cerner_client|athena_client/i,
-  /ENCRYPTION_AT_REST/i,
-  /mrn|medical.record/i,
-];
-
-// ─── PROTOTYPE / EXPERIMENT SIGNALS ──────────────────────────────────────
-const PROTOTYPE_PATH_SIGNALS = [
-  /^experiments\//i,
-  /^prototype/i,
-  /\/proto\//i,
-  /\/spike\//i,
-  /\/poc\//i,
-  /-prototype/i,
-  /-experimental/i,
-];
 
 function extractServices(content: string): string[] {
   return Object.entries(SERVICE_PATTERNS)
@@ -108,103 +69,105 @@ function extractServices(content: string): string[] {
 }
 
 function detectSecrets(content: string): boolean {
-  const patterns = [
+  return [
     /sk-[a-zA-Z0-9]{20,}/,
     /AKIA[0-9A-Z]{16}/,
     /ghp_[a-zA-Z0-9]{36}/,
     /xox[bps]-[a-zA-Z0-9-]+/,
     /SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/,
-  ];
-  return patterns.some((p) => p.test(content));
+  ].some((p) => p.test(content));
 }
 
-// Paths that are experiments/prototypes but NOT AI-related
-const NON_AI_EXPERIMENT_SIGNALS = [
-  /\/perf-benchmarks\//i,
-  /\/ab-tests\//i,
-  /\/load-test/i,
-  /\/benchmark/i,
-  /\/feature-flags\/(?!.*ai)/i, // feature flags that don't mention AI
-];
-
 function isPrototypePath(filePath: string): boolean {
-  // Must match a prototype signal
   if (!PROTOTYPE_PATH_SIGNALS.some((p) => p.test(filePath))) return false;
-  // Must NOT be a generic non-AI experiment (perf benchmarks, A/B tests, etc.)
-  // Exception: if the content itself has AI keywords, the caller should still flag it
-  if (NON_AI_EXPERIMENT_SIGNALS.some((p) => p.test(filePath))) return false;
+  if (NON_AI_EXPERIMENT_EXCLUSIONS.some((p) => p.test(filePath))) return false;
   return true;
 }
 
-function detectsPhiContext(content: string): boolean {
+function detectPhiContext(content: string): boolean {
   return PHI_ENV_SIGNALS.some((p) => p.test(content));
 }
 
-/**
- * Compute a base risk score BEFORE GPT classification.
- * GPT can override, but this ensures the heuristic fallback is strong.
- */
-function computeBaseRisk(agent: FoundAgent): {
+/** Scan inline content for known risk signals beyond the search pattern */
+function analyzeContentSignals(content: string): {
+  extraReasons: string[];
+  signalScore: number; // 0-1, used to boost risk
+} {
+  const extraReasons: string[] = [];
+  let signalScore = 0;
+
+  for (const signal of CONTENT_SIGNALS) {
+    if (signal.pattern.test(content)) {
+      signalScore += signal.weight;
+      // Only surface the highest-weight signals as reasons
+      if (signal.weight >= 0.7) {
+        extraReasons.push(signal.name.replace(/_/g, " "));
+      }
+    }
+  }
+
+  return { extraReasons, signalScore: Math.min(signalScore, 1) };
+}
+
+// ─── RISK FLOOR COMPUTATION ───────────────────────────────────────────────
+function computeBaseRisk(agent: FoundAgent, pattern: DetectionPattern, boostMap: Map<string, number>): {
   floor: string;
   escalationReasons: string[];
 } {
   const reasons: string[] = [];
   let level = "medium";
 
-  // Secrets → always critical
-  if (agent.has_secrets) {
+  // Apply pattern's own floor
+  if (pattern.riskFloor) level = maxRisk(level, pattern.riskFloor);
+
+  // Apply PHI-critical rule
+  if (pattern.phiCritical && agent.phi_context) {
     level = "critical";
-    reasons.push("hardcoded secrets detected");
+    reasons.push("AI/ML system processing PHI — potential HIPAA violation. Verify BAA with any third-party AI providers.");
   }
 
-  // LLM + PHI environment = critical
-  if (
-    (agent.agent_type === "OpenAI" || agent.agent_type === "Anthropic" ||
-     agent.agent_type === "LangChain" || agent.agent_type === "ML Service" ||
-     agent.services.includes("openai") || agent.services.includes("anthropic")) &&
-    agent.phi_context
-  ) {
-    level = "critical";
-    reasons.push("LLM integration in HIPAA/PHI environment — potential data compliance violation");
-  }
-
-  // Prototype path → minimum high
-  if (agent.is_prototype) {
-    if (level !== "critical") level = "high";
-    reasons.push("prototype/experiment code in production repo — likely no owner or governance");
-  }
-
-  // ML service (internal scoring endpoint) → high
-  if (agent.agent_type === "ML Service") {
-    if (level !== "critical") level = "high";
-    reasons.push("custom ML scoring service — verify owner and data access scope");
-  }
-
-  // AI feature flag → medium minimum, flag as dormant AI risk
-  if (agent.agent_type === "AI Feature Flag") {
-    reasons.push("disabled AI system exists in codebase — no documented owner or activation criteria");
-  }
-
-  // Long dormancy escalations
-  if (agent.days_since_commit !== null) {
-    if (agent.days_since_commit > 180 && level !== "critical") {
-      level = "critical";
-      reasons.push(`owner gone ${agent.days_since_commit} days — system likely orphaned`);
-    } else if (agent.days_since_commit > 90 && level === "medium") {
-      level = "high";
-      reasons.push(`no commits in ${agent.days_since_commit} days — likely unowned`);
+  // Apply all contextual rules
+  for (const rule of CONTEXTUAL_RULES) {
+    if (rule.condition({
+      phi: agent.phi_context,
+      isProto: agent.is_prototype,
+      hasSecrets: agent.has_secrets,
+      services: agent.services,
+      agentType: agent.agent_type,
+      daysSinceCommit: agent.days_since_commit,
+    })) {
+      level = maxRisk(level, rule.riskFloor);
+      reasons.push(rule.reason);
     }
   }
 
-  // Many external services → elevate
-  if (agent.services.length >= 3 && level === "medium") {
-    level = "high";
-    reasons.push(`connects to ${agent.services.length} external services`);
+  // Hardcoded secrets → always critical
+  if (agent.has_secrets) {
+    level = "critical";
+    reasons.push("Hardcoded credentials detected in AI system — immediate rotation required.");
   }
 
-  return { floor: level, escalationReasons: reasons };
+  // Inline content signals
+  if (agent.signal_score > 0.7) {
+    level = maxRisk(level, "high");
+    reasons.push(...agent.extra_reasons);
+  }
+
+  // Pattern boost (from learning engine — high-precision patterns → elevate)
+  if (boostMap.get(pattern.query) === 1.5 && level === "medium") {
+    level = "high";
+    reasons.push("Historically high-confidence detection pattern.");
+  }
+
+  return { floor: level, escalationReasons: [...new Set(reasons)] }; // dedupe
 }
 
+function maxRisk(a: string, b: string): string {
+  const order = ["low", "medium", "high", "critical"];
+  return order.indexOf(a) >= order.indexOf(b) ? a : b;
+}
+
+// ─── FOUND AGENT TYPE ─────────────────────────────────────────────────────
 interface FoundAgent {
   name: string;
   repo: string;
@@ -215,32 +178,41 @@ interface FoundAgent {
   last_commit_at: string | null;
   days_since_commit: number | null;
   agent_type: string;
+  detection_class: string;
   services: string[];
   has_secrets: boolean;
   is_prototype: boolean;
   phi_context: boolean;
+  signal_score: number;
+  extra_reasons: string[];
   tier: number;
+  pattern_query: string;
 }
 
+// ─── GPT CLASSIFICATION ───────────────────────────────────────────────────
 async function classifyAgent(
-  agent: FoundAgent
-): Promise<{ risk_level: string; risk_reason: string; description: string }> {
-  const { floor, escalationReasons } = computeBaseRisk(agent);
+  agent: FoundAgent,
+  pattern: DetectionPattern,
+  boostMap: Map<string, number>,
+): Promise<{ risk_level: string; risk_reason: string; description: string; compliance_tags: string[] }> {
+  const { floor, escalationReasons } = computeBaseRisk(agent, pattern, boostMap);
 
   const escalationNote = escalationReasons.length > 0
-    ? `\n\nPRE-COMPUTED ESCALATIONS (must honor these — do not downgrade below "${floor}"):\n` +
-      escalationReasons.map((r) => `- ${r}`).join("\n")
+    ? `\n\nPRE-COMPUTED RISK ESCALATIONS (enforce these — do not downgrade below "${floor}"):\n` +
+      escalationReasons.map((r) => `• ${r}`).join("\n")
     : "";
 
-  const prompt = `You are a security analyst. Classify this AI asset found in a GitHub organization.
+  const prompt = `You are a security and compliance analyst specializing in AI governance.
+Classify this AI asset found in a GitHub organization.
 
-Asset file: ${agent.file_path}
-Repository: ${agent.repo}
+Detection class: ${agent.detection_class}
 Asset type: ${agent.agent_type}
-Last commit by: ${agent.owner_github ?? "unknown"}
-Days since last commit: ${agent.days_since_commit ?? "unknown"}
-Connected services: ${agent.services.join(", ") || "none detected"}
-Contains hardcoded secrets: ${agent.has_secrets}
+File: ${agent.file_path}
+Repository: ${agent.repo}
+Last commit by: ${agent.owner_github ?? "UNKNOWN"}
+Days since last commit: ${agent.days_since_commit ?? "UNKNOWN"}
+External services connected: ${agent.services.join(", ") || "none detected"}
+Hardcoded secrets present: ${agent.has_secrets}
 In prototype/experiment directory: ${agent.is_prototype}
 PHI/HIPAA environment signals: ${agent.phi_context}
 ${escalationNote}
@@ -248,17 +220,19 @@ ${escalationNote}
 Code snippet (first 2000 chars):
 ${agent.content.slice(0, 2000)}
 
-Respond in JSON with:
-- risk_level: "critical" | "high" | "medium" | "low"
-- risk_reason: one sentence explaining the primary risk
-- description: one sentence describing what this asset does
+Respond ONLY in JSON with these exact fields:
+{
+  "risk_level": "critical" | "high" | "medium" | "low",
+  "risk_reason": "one sentence — the most important risk, specific to this asset",
+  "description": "one sentence — what this asset does",
+  "compliance_tags": ["HIPAA", "SOC2", "EU_AI_ACT", "ISO42001"] — applicable tags only
+}
 
-Rules:
-- critical: secrets present, LLM+PHI environment, owner gone >180 days, prototype with no auth
-- high: connects to external services + owner gone >90 days, custom ML service, unreviewed prototype
-- medium: runs autonomously, owner gone >30 days, AI feature flag (dormant)
-- low: simple scripts, recently maintained, well-documented owner
-- Never downgrade below the pre-computed floor: "${floor}"`;
+Risk level rules (STRICT — never downgrade below "${floor}"):
+- critical: secrets present, LLM+PHI, unauth prototype with patient data, autonomous approval without human review, owner gone >180 days
+- high: custom ML service, clinical AI system, owner gone >90 days, multi-service AI agent
+- medium: AI feature flag (disabled), basic automation, well-documented owner
+- low: simple scripts, recently maintained, no PHI exposure`;
 
   try {
     const response = await withRetry(
@@ -267,15 +241,15 @@ Rules:
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         temperature: 0.1,
-        max_tokens: 200,
+        max_tokens: 250,
       }),
       {
         label: `classify(${agent.name})`,
         maxAttempts: 3,
         baseDelayMs: 2000,
         shouldRetry: (err) => {
-          const status = (err as { status?: number })?.status;
-          return status === 429 || status === 503;
+          const s = (err as { status?: number })?.status;
+          return s === 429 || s === 503;
         },
       }
     );
@@ -283,30 +257,34 @@ Rules:
     const result = JSON.parse(response.choices[0].message.content ?? "{}");
 
     // Enforce floor — GPT cannot downgrade past heuristic minimum
-    const RISK_ORDER = ["low", "medium", "high", "critical"];
-    const resultLevel = result.risk_level ?? floor;
-    const finalLevel =
-      RISK_ORDER.indexOf(resultLevel) >= RISK_ORDER.indexOf(floor)
-        ? resultLevel
-        : floor;
+    const ORDER = ["low", "medium", "high", "critical"];
+    const finalLevel = ORDER.indexOf(result.risk_level ?? "medium") >= ORDER.indexOf(floor)
+      ? (result.risk_level ?? "medium")
+      : floor;
 
-    const allReasons = [result.risk_reason, ...escalationReasons].filter(Boolean).join("; ");
+    // Combine GPT reason with escalation reasons
+    const allReasons = [result.risk_reason, ...escalationReasons]
+      .filter(Boolean)
+      .slice(0, 3) // max 3 reasons
+      .join(" | ");
 
     return {
       risk_level: finalLevel,
-      risk_reason: allReasons.slice(0, 500),
-      description: result.description ?? "AI asset detected",
+      risk_reason: allReasons.slice(0, 600),
+      description: result.description ?? `${agent.agent_type} detected`,
+      compliance_tags: Array.isArray(result.compliance_tags) ? result.compliance_tags : [],
     };
   } catch {
-    // Heuristic fallback — never fail the scan because GPT is down
     return {
       risk_level: floor,
-      risk_reason: escalationReasons.join("; ") || "Classified by heuristic (AI unavailable)",
+      risk_reason: escalationReasons.join(" | ") || "Classified by heuristic",
       description: `${agent.agent_type} in ${agent.repo}`,
+      compliance_tags: agent.phi_context ? ["HIPAA"] : [],
     };
   }
 }
 
+// ─── MAIN SCAN ────────────────────────────────────────────────────────────
 export async function runScan(scanId: string, workspaceId: string) {
   const { data: workspace } = await adminClient
     .from("workspaces")
@@ -315,24 +293,31 @@ export async function runScan(scanId: string, workspaceId: string) {
     .single();
 
   if (!workspace?.github_token || !workspace?.github_org) {
-    await adminClient
-      .from("scans")
-      .update({ status: "failed", error_message: "GitHub not configured" })
-      .eq("id", scanId);
+    await adminClient.from("scans").update({ status: "failed", error_message: "GitHub not configured" }).eq("id", scanId);
     return;
   }
 
-  const octokit = new Octokit({
-    auth: workspace.github_token,
-    request: { timeout: 30_000 },
-  });
-
+  const octokit = new Octokit({ auth: workspace.github_token, request: { timeout: 30_000 } });
   scanLogger.info({ scanId, workspaceId, org: workspace.github_org }, "scan: starting");
-
   await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
 
   const scanStart = Date.now();
-  const TIME_LIMIT_MS = 4 * 60 * 1000;
+
+  // Load learning engine data in parallel
+  const [suppressedPatterns, boostMap] = await Promise.all([
+    getSuppressedPatterns(),
+    getPatternBoosts(),
+  ]);
+
+  // Filter out suppressed patterns
+  const activePatterns = ALL_PATTERNS.filter(p => !suppressedPatterns.has(p.query));
+
+  scanLogger.info({
+    scanId,
+    totalPatterns: ALL_PATTERNS.length,
+    activePatterns: activePatterns.length,
+    suppressed: suppressedPatterns.size,
+  }, "scan: patterns loaded");
 
   try {
     const repos = await withRetry(
@@ -357,123 +342,16 @@ export async function runScan(scanId: string, workspaceId: string) {
     const foundAgents: FoundAgent[] = [];
     let reposScanned = 0;
 
-    // Fetch .env.example / .env.example.* from the org's repos to detect
-    // PHI context and ML service env vars — single search, not per-pattern
-    const envFileCache: Record<string, string> = {};
+    // ── PRE-SCAN: env files + feature flag files (no rate limit cost) ─────
     for (const repo of targetRepos.slice(0, 3)) {
-      try {
-        const envFile = await octokit.repos.getContent({
-          owner: workspace.github_org,
-          repo: repo.name,
-          path: ".env.example",
-        });
-        if ("content" in envFile.data && envFile.data.content) {
-          const content = Buffer.from(envFile.data.content, "base64").toString("utf-8");
-          envFileCache[repo.full_name] = content;
+      // Scan .env.example for ML service env vars, API keys, PHI signals
+      await scanEnvFile(repo, workspace.github_org, octokit, foundAgents);
 
-          // Check for ML service env vars directly
-          if (
-            /ML_SCORING_SERVICE_URL|ML_MODEL_VERSION|ML_CONFIDENCE_THRESHOLD/i.test(content) ||
-            /OPENAI_API_KEY|ANTHROPIC_API_KEY|FF_AI_/i.test(content)
-          ) {
-            const isPhiRepo = detectsPhiContext(content);
-            const hasOpenAI = /OPENAI_API_KEY/i.test(content);
-            const hasMlService = /ML_SCORING_SERVICE_URL/i.test(content);
-            const hasAIFlag = /FF_AI_[A-Z_]+=false/i.test(content);
-
-            if (hasOpenAI || hasMlService) {
-              foundAgents.push({
-                name: ".env.example",
-                repo: repo.full_name,
-                file_path: ".env.example",
-                content: content.slice(0, 2000),
-                owner_github: null,
-                owner_email: null,
-                last_commit_at: null,
-                days_since_commit: null,
-                agent_type: hasMlService ? "ML Service" : "OpenAI",
-                services: extractServices(content),
-                has_secrets: detectSecrets(content),
-                is_prototype: false,
-                phi_context: isPhiRepo,
-                tier: hasMlService ? 2 : 1,
-              });
-            }
-
-            if (hasAIFlag) {
-              // Extract which flags
-              const flagMatches = content.match(/FF_AI_[A-Z_]+=\w+/gi) ?? [];
-              for (const flag of flagMatches) {
-                foundAgents.push({
-                  name: flag,
-                  repo: repo.full_name,
-                  file_path: ".env.example",
-                  content: `Feature flag: ${flag}\n\nFull env context:\n${content.slice(0, 1000)}`,
-                  owner_github: null,
-                  owner_email: null,
-                  last_commit_at: null,
-                  days_since_commit: null,
-                  agent_type: "AI Feature Flag",
-                  services: [],
-                  has_secrets: false,
-                  is_prototype: false,
-                  phi_context: isPhiRepo,
-                  tier: 3,
-                });
-              }
-            }
-          }
-        }
-      } catch {
-        // No .env.example in this repo — fine
-      }
-
-      // Also scan feature flag JSON files for AI-related flags
-      const flagFilePaths = [
-        "experiments/feature-flags/flag-config.json",
-        "config/feature-flags/flags.json",
-        "feature-flags.json",
-        "flags.json",
-      ];
-      for (const flagPath of flagFilePaths) {
-        try {
-          const flagFile = await octokit.repos.getContent({
-            owner: workspace.github_org,
-            repo: repo.name,
-            path: flagPath,
-          });
-          if ("content" in flagFile.data && flagFile.data.content) {
-            const content = Buffer.from(flagFile.data.content, "base64").toString("utf-8");
-            // Look for AI-related flags by name
-            const aiFlags = content.match(/"(ai[-_][^"]+|[^"]*[-_]ai[^"]*|[^"]*llm[^"]*|[^"]*ml[-_][^"]*)"/gi) ?? [];
-            for (const flagMatch of aiFlags) {
-              const flagName = flagMatch.replace(/"/g, "");
-              // Skip non-flag JSON keys (description, notes, etc.)
-              if (["description", "notes", "type", "seed", "property", "operator", "value"].includes(flagName)) continue;
-              foundAgents.push({
-                name: flagName,
-                repo: repo.full_name,
-                file_path: flagPath,
-                content: `AI feature flag: "${flagName}"\n\nFull flag config:\n${content.slice(0, 2000)}`,
-                owner_github: null,
-                owner_email: null,
-                last_commit_at: null,
-                days_since_commit: null,
-                agent_type: "AI Feature Flag",
-                services: [],
-                has_secrets: false,
-                is_prototype: flagPath.startsWith("experiments/"),
-                phi_context: envFileCache[repo.full_name] ? detectsPhiContext(envFileCache[repo.full_name]) : false,
-                tier: 3,
-              });
-            }
-          }
-        } catch {
-          // Flag file doesn't exist in this repo
-        }
-      }
+      // Scan feature flag JSON files for AI-related flags
+      await scanFlagFiles(repo, workspace.github_org, octokit, foundAgents);
     }
 
+    // ── MAIN SCAN LOOP ────────────────────────────────────────────────────
     for (const repo of targetRepos) {
       if (Date.now() - scanStart > TIME_LIMIT_MS) {
         scanLogger.warn({ scanId, reposScanned }, "scan: time limit reached");
@@ -483,20 +361,16 @@ export async function runScan(scanId: string, workspaceId: string) {
       reposScanned++;
 
       if (reposScanned % 3 === 0) {
-        await adminClient
-          .from("scans")
-          .update({ repos_scanned: reposScanned })
-          .eq("id", scanId);
+        await adminClient.from("scans").update({ repos_scanned: reposScanned }).eq("id", scanId);
       }
 
-      const repoPhiContext = envFileCache[repo.full_name]
-        ? detectsPhiContext(envFileCache[repo.full_name])
-        : false;
+      // Detect PHI context from env file cached above
+      const repoPhiContext = foundAgents.some(a => a.repo === repo.full_name && a.phi_context);
 
-      for (const pattern of AGENT_PATTERNS) {
+      for (const pattern of activePatterns) {
         if (Date.now() - scanStart > TIME_LIMIT_MS) break;
 
-        await sleep(2000);
+        await sleep(2000); // GitHub search rate limit: 30 req/min
 
         try {
           const searchResult = await withRetry(
@@ -509,25 +383,18 @@ export async function runScan(scanId: string, workspaceId: string) {
               maxAttempts: 3,
               baseDelayMs: 5000,
               shouldRetry: (err) => {
-                const status = (err as { status?: number })?.status;
-                return status === 429 || status === 503 || status === 504 ||
+                const s = (err as { status?: number })?.status;
+                return s === 429 || s === 503 || s === 504 ||
                   String(err).includes("secondary rate limit");
               },
             }
           );
 
           for (const item of searchResult.data.items) {
-            if (
-              item.path.includes("node_modules") ||
-              item.path.includes("vendor") ||
-              item.path.includes(".lock") ||
-              item.path.includes("package-lock") ||
-              item.path.includes(".min.")
-            ) continue;
-
-            if (foundAgents.some((a) => a.repo === repo.full_name && a.file_path === item.path)) {
-              continue;
-            }
+            // Skip noise
+            if (["node_modules", "vendor", ".lock", "package-lock", ".min."].some(s => item.path.includes(s))) continue;
+            // Skip duplicates (same file already found by another pattern)
+            if (foundAgents.some(a => a.repo === repo.full_name && a.file_path === item.path)) continue;
 
             try {
               const fileContent = await octokit.repos.getContent({
@@ -536,61 +403,55 @@ export async function runScan(scanId: string, workspaceId: string) {
                 path: item.path,
               });
 
-              if ("content" in fileContent.data && fileContent.data.content) {
-                const encoding = (fileContent.data as { encoding?: string }).encoding;
-                if (encoding !== "base64") continue;
+              if (!("content" in fileContent.data && fileContent.data.content)) continue;
+              if ((fileContent.data as { encoding?: string }).encoding !== "base64") continue;
 
-                let content: string;
-                try {
-                  content = Buffer.from(fileContent.data.content, "base64").toString("utf-8");
-                } catch {
-                  continue;
-                }
+              let content: string;
+              try { content = Buffer.from(fileContent.data.content, "base64").toString("utf-8"); }
+              catch { continue; }
+              if (content.length > 500_000) continue;
 
-                if (content.length > 500_000) continue;
+              const commits = await octokit.repos.listCommits({
+                owner: workspace.github_org,
+                repo: repo.name,
+                path: item.path,
+                per_page: 1,
+              });
 
-                const commits = await octokit.repos.listCommits({
-                  owner: workspace.github_org,
-                  repo: repo.name,
-                  path: item.path,
-                  per_page: 1,
-                });
+              const lastCommit = commits.data[0];
+              const lastCommitDate = lastCommit?.commit?.author?.date ?? null;
+              const daysSince = lastCommitDate
+                ? Math.floor((Date.now() - new Date(lastCommitDate).getTime()) / 86400000)
+                : null;
 
-                const lastCommit = commits.data[0];
-                const lastCommitDate = lastCommit?.commit?.author?.date ?? null;
-                const daysSince = lastCommitDate
-                  ? Math.floor((Date.now() - new Date(lastCommitDate).getTime()) / 86400000)
-                  : null;
+              const { extraReasons, signalScore } = analyzeContentSignals(content);
 
-                const isProto = isPrototypePath(item.path);
-                const phiCtx = repoPhiContext || detectsPhiContext(content);
-
-                foundAgents.push({
-                  name: item.name,
-                  repo: repo.full_name,
-                  file_path: item.path,
-                  content,
-                  owner_github: lastCommit?.author?.login ?? null,
-                  owner_email: lastCommit?.commit?.author?.email ?? null,
-                  last_commit_at: lastCommitDate,
-                  days_since_commit: daysSince,
-                  agent_type: pattern.label,
-                  services: extractServices(content),
-                  has_secrets: detectSecrets(content),
-                  is_prototype: isProto,
-                  phi_context: phiCtx,
-                  tier: pattern.tier,
-                });
-              }
+              foundAgents.push({
+                name: item.name,
+                repo: repo.full_name,
+                file_path: item.path,
+                content,
+                owner_github: lastCommit?.author?.login ?? null,
+                owner_email: lastCommit?.commit?.author?.email ?? null,
+                last_commit_at: lastCommitDate,
+                days_since_commit: daysSince,
+                agent_type: pattern.label,
+                detection_class: pattern.class,
+                services: extractServices(content),
+                has_secrets: detectSecrets(content),
+                is_prototype: isPrototypePath(item.path),
+                phi_context: repoPhiContext || detectPhiContext(content),
+                signal_score: signalScore,
+                extra_reasons: extraReasons,
+                tier: pattern.tier,
+                pattern_query: pattern.query,
+              });
             } catch {
-              // Skip unreadable files
+              // Skip unreadable files silently
             }
           }
         } catch (err) {
-          scanLogger.warn(
-            { scanId, repo: repo.full_name, pattern: pattern.query, err: String(err) },
-            "scan: search error, continuing"
-          );
+          scanLogger.warn({ scanId, repo: repo.full_name, pattern: pattern.query, err: String(err) }, "scan: search error");
         }
       }
     }
@@ -603,8 +464,20 @@ export async function runScan(scanId: string, workspaceId: string) {
       agents_found: foundAgents.length,
     }).eq("id", scanId);
 
+    // ── CLASSIFY ──────────────────────────────────────────────────────────
+    const byClass: Record<string, number> = {};
+    const byRisk: Record<string, number> = {};
+
     for (const agent of foundAgents) {
-      const classification = await classifyAgent(agent);
+      const pattern = ALL_PATTERNS.find(p => p.query === agent.pattern_query)
+        ?? ALL_PATTERNS.find(p => p.label === agent.agent_type)
+        ?? { query: agent.pattern_query, label: agent.agent_type, class: agent.detection_class as never, tier: agent.tier };
+
+      const classification = await classifyAgent(agent, pattern, boostMap);
+
+      // Track metrics
+      byClass[agent.detection_class] = (byClass[agent.detection_class] ?? 0) + 1;
+      byRisk[classification.risk_level] = (byRisk[classification.risk_level] ?? 0) + 1;
 
       const insert = {
         scan_id: scanId,
@@ -636,6 +509,15 @@ export async function runScan(scanId: string, workspaceId: string) {
       );
     }
 
+    // ── RECORD SCAN METRICS ───────────────────────────────────────────────
+    await recordScanMetrics({
+      orgId: workspace.owner_id,
+      scanId,
+      totalFound: foundAgents.length,
+      byClass,
+      byRisk,
+    });
+
     scanLogger.info({ scanId, workspaceId, agentsFound: foundAgents.length }, "scan: completed");
 
     await adminClient.from("scans").update({
@@ -654,9 +536,142 @@ export async function runScan(scanId: string, workspaceId: string) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
     scanLogger.error({ scanId, workspaceId, message, stack }, "scan: failed");
-    await adminClient
-      .from("scans")
-      .update({ status: "failed", error_message: message })
-      .eq("id", scanId);
+    await adminClient.from("scans").update({ status: "failed", error_message: message }).eq("id", scanId);
   }
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────
+
+async function scanEnvFile(
+  repo: { full_name: string; name: string },
+  org: string,
+  octokit: Octokit,
+  foundAgents: FoundAgent[],
+): Promise<void> {
+  for (const envPath of [".env.example", ".env.sample", ".env.template"]) {
+    try {
+      const envFile = await octokit.repos.getContent({ owner: org, repo: repo.name, path: envPath });
+      if (!("content" in envFile.data && envFile.data.content)) continue;
+
+      const content = Buffer.from(envFile.data.content, "base64").toString("utf-8");
+      const isPhi = detectPhiContext(content);
+      const { extraReasons, signalScore } = analyzeContentSignals(content);
+
+      // OpenAI API key
+      if (/OPENAI_API_KEY/i.test(content)) {
+        foundAgents.push(makeEnvAsset(repo.full_name, envPath, "OpenAI", "LLM_INTEGRATION", content, isPhi, extraReasons, signalScore, "openai.chat.completions"));
+      }
+      // Anthropic key
+      if (/ANTHROPIC_API_KEY/i.test(content)) {
+        foundAgents.push(makeEnvAsset(repo.full_name, envPath, "Anthropic Claude", "LLM_INTEGRATION", content, isPhi, extraReasons, signalScore, "import anthropic"));
+      }
+      // Custom ML service
+      if (/ML_SCORING_SERVICE_URL|ML_MODEL_VERSION/i.test(content)) {
+        foundAgents.push(makeEnvAsset(repo.full_name, envPath, "ML Scoring Service", "ML_SERVICE", content, isPhi, extraReasons, signalScore, "ML_SCORING_SERVICE_URL"));
+      }
+      // AI feature flags
+      const aiFlags = content.match(/FF_AI_[A-Z_]+=\w+/gi) ?? [];
+      for (const flag of aiFlags) {
+        foundAgents.push(makeEnvAsset(repo.full_name, envPath, "AI Feature Flag", "AI_FEATURE_FLAG",
+          `Flag: ${flag}\n\nContext:\n${content.slice(0, 1000)}`, isPhi, [], 0, "FF_AI_"));
+      }
+
+      break; // Found an env file, stop checking alternatives
+    } catch {
+      // No env file at this path
+    }
+  }
+}
+
+async function scanFlagFiles(
+  repo: { full_name: string; name: string },
+  org: string,
+  octokit: Octokit,
+  foundAgents: FoundAgent[],
+): Promise<void> {
+  const isPhi = foundAgents.some(a => a.repo === repo.full_name && a.phi_context);
+
+  for (const flagPath of FLAG_FILE_PATHS) {
+    try {
+      const flagFile = await octokit.repos.getContent({ owner: org, repo: repo.name, path: flagPath });
+      if (!("content" in flagFile.data && flagFile.data.content)) continue;
+
+      const content = Buffer.from(flagFile.data.content, "base64").toString("utf-8");
+
+      // Parse and find AI-related flag names
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(content); } catch { continue; }
+
+      // Handle both { flags: { ... } } and flat { flagName: { ... } } structures
+      const flagsObj = (parsed.flags ?? parsed) as Record<string, unknown>;
+
+      for (const [flagName, flagDef] of Object.entries(flagsObj)) {
+        if (!AI_FLAG_NAME_PATTERN.test(flagName)) continue;
+        if (typeof flagDef !== "object" || flagDef === null) continue;
+
+        const def = flagDef as Record<string, unknown>;
+        const notes = String(def.notes ?? "");
+        const enabled = Boolean(def.enabled);
+        const rollout = Number(def.rolloutPercentage ?? 0);
+
+        foundAgents.push({
+          name: flagName,
+          repo: repo.full_name,
+          file_path: flagPath,
+          content: `AI feature flag: "${flagName}"\nEnabled: ${enabled}\nRollout: ${rollout}%\nNotes: ${notes}\n\nFull config:\n${content.slice(0, 1500)}`,
+          owner_github: null,
+          owner_email: null,
+          last_commit_at: null,
+          days_since_commit: null,
+          agent_type: enabled && rollout > 0 ? "Active AI System" : "AI Feature Flag",
+          detection_class: "AI_FEATURE_FLAG",
+          services: [],
+          has_secrets: false,
+          is_prototype: flagPath.startsWith("experiments/"),
+          phi_context: isPhi,
+          signal_score: enabled && rollout > 0 ? 0.7 : 0.3,
+          extra_reasons: enabled && rollout > 0 ? [`active at ${rollout}% rollout`] : ["disabled — dormant AI system"],
+          tier: 3,
+          pattern_query: "FF_AI_",
+        });
+      }
+
+      break;
+    } catch {
+      // No flag file at this path
+    }
+  }
+}
+
+function makeEnvAsset(
+  repoFullName: string,
+  filePath: string,
+  agentType: string,
+  detectionClass: string,
+  content: string,
+  phiContext: boolean,
+  extraReasons: string[],
+  signalScore: number,
+  patternQuery: string,
+): FoundAgent {
+  return {
+    name: filePath,
+    repo: repoFullName,
+    file_path: filePath,
+    content: content.slice(0, 2000),
+    owner_github: null,
+    owner_email: null,
+    last_commit_at: null,
+    days_since_commit: null,
+    agent_type: agentType,
+    detection_class: detectionClass,
+    services: extractServices(content),
+    has_secrets: detectSecrets(content),
+    is_prototype: false,
+    phi_context: phiContext,
+    signal_score: signalScore,
+    extra_reasons: extraReasons,
+    tier: 2,
+    pattern_query: patternQuery,
+  };
 }
