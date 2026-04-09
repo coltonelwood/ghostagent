@@ -684,3 +684,23 @@ export interface ComplianceReport {
   gaps: ComplianceGap[];
   generatedAt: string;
 }
+
+// ---- SDK Report Types ----
+
+export interface SDKReportAsset {
+  externalId: string;
+  name: string;
+  description?: string;
+  kind?: AssetKind;
+  environment?: "production" | "staging" | "development" | "unknown";
+  ownerEmail?: string;
+  aiServices?: AIService[];
+  dataClassification?: string[];
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface SDKReportPayload {
+  source?: string;
+  assets: SDKReportAsset[];
+}

@@ -40,9 +40,22 @@ export const GET = withLogging(async () => {
     return NextResponse.json({ error: "Failed to fetch members" }, { status: 500 });
   }
 
+  // Enrich members with user email from auth.users
+  const members = membersRes.data ?? [];
+  const enrichedMembers = await Promise.all(
+    members.map(async (m) => {
+      try {
+        const { data: { user: authUser } } = await db.auth.admin.getUserById(m.user_id);
+        return { ...m, user_email: authUser?.email ?? null };
+      } catch {
+        return { ...m, user_email: null };
+      }
+    })
+  );
+
   return NextResponse.json({
     data: {
-      members: membersRes.data ?? [],
+      members: enrichedMembers,
       invitations: invitationsRes.data ?? [],
     },
   });

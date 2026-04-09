@@ -1,5 +1,6 @@
-import type { Asset, Policy, PolicyConditionGroup, PolicyRule, PolicySeverity } from "./types/platform";
+import type { Asset, Policy, PolicyConditionGroup, PolicyRule, PolicySeverity, PolicyAction } from "./types/platform";
 import { adminClient } from "./supabase/admin";
+import { emitEvent } from "./event-system";
 import { logger } from "./logger";
 
 type FieldVal = string | number | boolean | string[] | null | undefined;
@@ -86,13 +87,34 @@ export async function runPoliciesForOrg(orgId: string, assetIds?: string[]): Pro
       if (evaluatePolicy(typedPolicy, asset as unknown as Asset)) violating.add(asset.id);
     }
 
+    // Get asset details for action dispatch (only for new violations)
+    const assetDetails: Record<string, Asset> = {};
+    if (violating.size > 0) {
+      const {data:assetRows} = await adminClient.from("assets").select("*").in("id", Array.from(violating));
+      for (const a of assetRows ?? []) assetDetails[a.id] = a as unknown as Asset;
+    }
+
     for (const assetId of violating) {
+      // Check if this is a new violation
+      const {data:existing} = await adminClient.from("policy_violations")
+        .select("id").eq("policy_id", policy.id).eq("asset_id", assetId).eq("status", "open").single();
+
       const {error} = await adminClient.from("policy_violations").upsert({
         policy_id: policy.id, asset_id: assetId, org_id: orgId,
         status:"open", severity:policy.severity, last_detected_at:new Date().toISOString(),
         details:{policy_name:policy.name},
       },{onConflict:"policy_id,asset_id"});
       if (!error) created++;
+
+      // Dispatch policy actions only for newly detected violations
+      if (!existing && !typedPolicy.dry_run_mode) {
+        const asset = assetDetails[assetId];
+        if (asset) {
+          await dispatchPolicyActions(typedPolicy, asset, orgId).catch(e =>
+            logger.error({e, policyId: policy.id, assetId}, "policy action dispatch failed")
+          );
+        }
+      }
     }
 
     const {data:open} = await adminClient.from("policy_violations")
@@ -112,6 +134,90 @@ export async function runPoliciesForOrg(orgId: string, assetIds?: string[]): Pro
 
   logger.info({orgId,created,resolved},"policy_engine: run complete");
   return {created,resolved};
+}
+
+/**
+ * Execute all actions defined in a policy for a violating asset.
+ */
+async function dispatchPolicyActions(policy: Policy, asset: Asset, orgId: string): Promise<void> {
+  const actions: PolicyAction[] = policy.actions ?? [];
+  if (!actions.length) return;
+
+  for (const action of actions) {
+    try {
+      switch (action.type) {
+        case "alert_owner": {
+          if (!asset.owner_email) break;
+          await emitEvent({
+            orgId, kind: "policy_violated", severity: policy.severity,
+            title: "Policy violation: " + policy.name,
+            body: "Asset " + asset.name + " violates policy. Owner: " + asset.owner_email,
+            assetId: asset.id, policyId: policy.id,
+            metadata: { action: "alert_owner", owner_email: asset.owner_email },
+          });
+          break;
+        }
+        case "alert_admin": {
+          await emitEvent({
+            orgId, kind: "policy_violated", severity: policy.severity,
+            title: "Policy violation: " + policy.name,
+            body: "Asset " + asset.name + " requires admin attention.",
+            assetId: asset.id, policyId: policy.id,
+            metadata: { action: "alert_admin" },
+          });
+          break;
+        }
+        case "alert_slack":
+        case "alert_webhook": {
+          // Routed through emitEvent → event-system → alert_preferences dispatch
+          await emitEvent({
+            orgId, kind: "policy_violated", severity: policy.severity,
+            title: "Policy violation: " + policy.name,
+            body: "Asset: " + asset.name + " | Source: " + asset.source + " | Risk: " + asset.risk_level,
+            assetId: asset.id, policyId: policy.id,
+            metadata: { action: action.type, asset_source: asset.source, asset_risk: asset.risk_level },
+          });
+          break;
+        }
+        case "create_task": {
+          await adminClient.from("tasks").insert({
+            org_id: orgId,
+            asset_id: asset.id,
+            title: "Resolve policy violation: " + policy.name,
+            description: "Asset \"" + asset.name + "\" violates policy \"" + policy.name + "\". Review and remediate.",
+            status: "open",
+            priority: policy.severity === "critical" ? "critical" : policy.severity === "high" ? "high" : "medium",
+            assigned_to: null,
+            created_by: "00000000-0000-0000-0000-000000000000", // system
+            due_at: policy.severity === "critical"
+              ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h for critical
+              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days otherwise
+          });
+          break;
+        }
+        case "mark_flagged": {
+          await adminClient.from("assets")
+            .update({ review_status: "flagged", last_changed_at: new Date().toISOString() })
+            .eq("id", asset.id);
+          break;
+        }
+        case "quarantine": {
+          // Mark asset as quarantined in DB; connector-level quarantine requires separate call
+          await adminClient.from("assets")
+            .update({ status: "quarantined", last_changed_at: new Date().toISOString() })
+            .eq("id", asset.id);
+          await emitEvent({
+            orgId, kind: "asset_quarantined", severity: "critical",
+            title: "Asset quarantined by policy: " + policy.name,
+            assetId: asset.id, policyId: policy.id,
+          });
+          break;
+        }
+      }
+    } catch (err) {
+      logger.error({ err, action: action.type, assetId: asset.id }, "policy action failed");
+    }
+  }
 }
 
 export async function dryRunPolicy(policy: Policy, orgId: string): Promise<{matchingAssetIds:string[];matchCount:number}> {

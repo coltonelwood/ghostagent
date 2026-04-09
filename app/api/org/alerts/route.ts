@@ -63,14 +63,22 @@ export const PATCH = withLogging(async (req: NextRequest) => {
   const body = await req.json();
 
   // Only allow known fields
+  // Note: UI sends `event_filter_matrix` which we store as `event_filters`
   const allowed = [
     "slack_webhook_url", "slack_channel", "email_recipients",
-    "webhook_urls", "event_filters", "digest_mode",
-    "digest_schedule", "suppression_rules",
+    "webhook_urls", "event_filters", "event_filter_matrix",
+    "digest_mode", "digest_schedule", "suppression_rules",
   ];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
-    if (key in body) updates[key] = body[key];
+    if (key in body) {
+      // Normalize event_filter_matrix -> event_filters
+      if (key === "event_filter_matrix") {
+        updates.event_filters = body[key];
+      } else {
+        updates[key] = body[key];
+      }
+    }
   }
 
   const { data, error } = await db

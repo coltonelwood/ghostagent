@@ -137,7 +137,7 @@ export default function TeamPage() {
                   className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
                 >
                   <div>
-                    <p className="text-sm font-medium">{m.user?.email ?? "Unknown"}</p>
+                    <p className="text-sm font-medium">{(m as unknown as { user_email: string | null }).user_email ?? "Unknown"}</p>
                     <p className="text-xs text-muted-foreground">
                       Joined{" "}
                       {m.accepted_at
