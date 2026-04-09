@@ -1,10 +1,6 @@
 import { adminClient } from "./supabase/admin";
 import { getConnector, isHRConnector } from "./connectors";
-import { decrypt } from "./crypto";
-
-function decryptCredentials(encrypted: string): Record<string, string> {
-  return JSON.parse(decrypt(encrypted));
-}
+import { decryptCredentials } from "./crypto";
 import { scoreAsset, buildRiskContext } from "./risk-engine";
 import { resolveOwnership, shouldMarkOrphaned } from "./ownership-engine";
 import { runPoliciesForOrg } from "./policy-engine";

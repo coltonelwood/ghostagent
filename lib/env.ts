@@ -15,13 +15,13 @@ const REQUIRED_SERVER_ENV: string[] = [
   "STRIPE_PRO_PRICE_ID",
   "NEXT_PUBLIC_APP_URL",
   "INTERNAL_API_KEY",
+  "ENCRYPTION_KEY",  // Required for connector credential encryption
 ];
 
 // These are optional at startup but required for specific features
 const OPTIONAL_ENV: string[] = [
   "RESEND_API_KEY",
   "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-  "ENCRYPTION_KEY",
 ];
 
 export function validateEnv(): void {

@@ -15,8 +15,9 @@ export async function GET() {
 
   // Check DB connectivity
   try {
+    // Check both legacy and platform tables
     const { error } = await adminClient
-      .from("workspaces")
+      .from("organizations")
       .select("id")
       .limit(1)
       .maybeSingle();
