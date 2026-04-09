@@ -37,12 +37,13 @@ function ScanRunningInner() {
         const res = await fetch(`/api/scan/status?id=${scanId}`);
         if (!res.ok) return;
         const data = await res.json();
-        setScan(data);
+        const scanData: ScanStatus = data.scan ?? data; // API returns { scan: {...} } shape
+        setScan(scanData);
         attempts++;
-        if (data.status === "complete" || data.status === "completed") {
+        if (scanData.status === "complete" || scanData.status === "completed") {
           clearInterval(interval);
           router.push(`/dashboard/scan/${scanId}`);
-        } else if (data.status === "failed") {
+        } else if (scanData.status === "failed") {
           clearInterval(interval);
         } else if (attempts >= MAX_ATTEMPTS) {
           clearInterval(interval);
