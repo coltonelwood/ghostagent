@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Loader2, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,22 +66,27 @@ export default function TeamPage() {
 
     setEmail("");
     setInviting(false);
+    toast.success(`Invitation sent to ${email}`);
     load();
   }
 
   async function changeRole(memberId: string, newRole: string) {
     setChangingRole(memberId);
     try {
-      await fetch(`/api/org/members/${memberId}`, {
+      const res = await fetch(`/api/org/members/${memberId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: newRole }),
       });
+      if (!res.ok) { toast.error("Failed to update role"); return; }
       setMembers((prev) =>
         prev.map((m) =>
           m.id === memberId ? { ...m, role: newRole as OrgMember["role"] } : m
         )
       );
+      toast.success("Role updated");
+    } catch {
+      toast.error("Failed to update role");
     } finally {
       setChangingRole(null);
     }
@@ -91,8 +97,12 @@ export default function TeamPage() {
       return;
     setRemoving(memberId);
     try {
-      await fetch(`/api/org/members/${memberId}`, { method: "DELETE" });
+      const res = await fetch(`/api/org/members/${memberId}`, { method: "DELETE" });
+      if (!res.ok) { toast.error("Failed to remove member"); return; }
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      toast.success("Member removed");
+    } catch {
+      toast.error("Failed to remove member");
     } finally {
       setRemoving(null);
     }

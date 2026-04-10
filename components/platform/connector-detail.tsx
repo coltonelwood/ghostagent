@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,12 +77,16 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      await fetch(`/api/connectors/${connector.id}/sync`, {
-        method: "POST",
-      });
-      router.refresh();
+      const res = await fetch(`/api/connectors/${connector.id}/sync`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error ?? "Failed to start sync");
+      } else {
+        toast.success("Sync started — results will appear shortly");
+        setTimeout(() => router.refresh(), 3000);
+      }
     } catch {
-      // silently fail
+      toast.error("Failed to start sync. Please try again.");
     } finally {
       setSyncing(false);
     }
@@ -90,13 +95,16 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
-      await fetch(`/api/connectors/${connector.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/connectors/${connector.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Failed to disconnect connector");
+        setDisconnecting(false);
+        return;
+      }
+      toast.success("Connector disconnected");
       router.push("/platform/connectors");
     } catch {
-      // silently fail
-    } finally {
+      toast.error("Failed to disconnect. Please try again.");
       setDisconnecting(false);
     }
   };
