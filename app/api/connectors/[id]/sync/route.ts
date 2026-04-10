@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
 import { withLogging } from "@/lib/api-handler";
 import { getAdminClient } from "@/lib/supabase/admin";
@@ -50,7 +51,7 @@ export const POST = withLogging(
       }
 
       // Fire-and-forget async sync
-      syncConnector(id).catch(() => {});
+      syncConnector(id).catch((err) => logger.error({ connectorId: id, err }, "background sync failed"));
 
       return NextResponse.json({ success: true, message: "Sync started" });
     } catch (err) {

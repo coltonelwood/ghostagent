@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/link-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -145,7 +146,7 @@ export default function AssetsPage() {
         setHasMore(json.hasMore ?? false);
       }
     } catch {
-      // Silently handle fetch errors
+      toast.error("Failed to load assets. Please refresh.");
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Bell, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,11 +70,16 @@ export default function EventsPage() {
       ...(dateFrom && { from: dateFrom }),
       ...(dateTo && { to: dateTo }),
     });
-    const res = await fetch(`/api/events?${params}`);
-    const data = await res.json();
-    setEvents(data.data ?? []);
-    setTotal(data.total ?? 0);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/events?${params}`);
+      const data = await res.json();
+      setEvents(data.data ?? []);
+      setTotal(data.total ?? 0);
+    } catch {
+      toast.error("Failed to load events. Please refresh.");
+    } finally {
+      setLoading(false);
+    }
   }, [page, severity, kind, dateFrom, dateTo]);
 
   useEffect(() => {

@@ -121,7 +121,7 @@ export default function FrameworkDetailPage({ params }: { params: Promise<{ fram
           setControlStates(states);
         }
       })
-      .catch(() => {})
+      .catch(() => toast.error("Failed to load compliance data. Please refresh."))
       .finally(() => setLoading(false));
   }, [framework]);
 
