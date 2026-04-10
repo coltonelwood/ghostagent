@@ -45,11 +45,12 @@ const ENVIRONMENTS = ["production", "staging", "development", "unknown"];
 
 const SOURCE_OPTIONS = ["github", "gitlab", "bitbucket", "aws", "gcp", "azure", "zapier", "n8n", "make", "sdk"];
 const ACTION_TYPES = [
-  { id: "notify_slack", label: "Notify Slack", description: "Send alert to Slack channel" },
-  { id: "notify_email", label: "Notify Email", description: "Send email notification" },
-  { id: "create_task", label: "Create Task", description: "Create a remediation task" },
-  { id: "quarantine", label: "Quarantine Asset", description: "Quarantine the matching asset" },
-  { id: "webhook", label: "Fire Webhook", description: "POST to an external webhook URL" },
+  { id: "alert_slack",  label: "Notify Slack",       description: "Send an alert to your configured Slack channel" },
+  { id: "alert_admin", label: "Notify Team (Email)",  description: "Send email notification to org admin recipients" },
+  { id: "create_task", label: "Create Task",          description: "Create a remediation task assigned to the asset owner" },
+  { id: "mark_flagged",label: "Flag for Review",      description: "Mark matching assets as flagged for manual review" },
+  { id: "quarantine",  label: "Quarantine Asset",     description: "Quarantine the matching asset (use with caution)" },
+  { id: "alert_webhook",label: "Fire Webhook",        description: "POST event to your configured webhook URL" },
 ];
 
 function RuleRow({
@@ -444,7 +445,7 @@ export default function NewPolicyPage() {
                   <p className="text-xs text-muted-foreground">{action.description}</p>
                 </div>
               </label>
-              {selectedActions[action.id] && action.id === "webhook" && (
+              {selectedActions[action.id] && action.id === "alert_webhook" && (
                 <Input
                   className="h-8 text-sm ml-7"
                   value={actionConfigs[action.id] ?? ""}
@@ -454,24 +455,24 @@ export default function NewPolicyPage() {
                   placeholder="https://your-system.com/webhook"
                 />
               )}
-              {selectedActions[action.id] && action.id === "notify_email" && (
+              {selectedActions[action.id] && action.id === "alert_admin" && (
                 <Input
                   className="h-8 text-sm ml-7"
                   value={actionConfigs[action.id] ?? ""}
                   onChange={(e) =>
                     setActionConfigs({ ...actionConfigs, [action.id]: e.target.value })
                   }
-                  placeholder="alerts@company.com"
+                  placeholder="alerts@company.com (uses org alert preferences if blank)"
                 />
               )}
-              {selectedActions[action.id] && action.id === "notify_slack" && (
+              {selectedActions[action.id] && action.id === "alert_slack" && (
                 <Input
                   className="h-8 text-sm ml-7"
                   value={actionConfigs[action.id] ?? ""}
                   onChange={(e) =>
                     setActionConfigs({ ...actionConfigs, [action.id]: e.target.value })
                   }
-                  placeholder="#channel-name"
+                  placeholder="#channel-name (uses org default if blank)"
                 />
               )}
             </div>

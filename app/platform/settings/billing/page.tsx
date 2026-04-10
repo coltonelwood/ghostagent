@@ -72,7 +72,7 @@ export default function BillingPage() {
     ]).then(([orgData, analyticsData]) => {
       setOrg(orgData.data);
       setAssetCount(analyticsData.data?.totalAssets ?? 0);
-      setConnectorCount(analyticsData.data?.connectorsActive ?? 0);
+      setConnectorCount(analyticsData.data?.connectorCount ?? 0);
     });
   }, []);
 

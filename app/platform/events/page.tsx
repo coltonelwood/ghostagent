@@ -94,7 +94,7 @@ export default function EventsPage() {
           size="sm"
           variant="outline"
           onClick={async () => {
-            await fetch("/api/notifications", {
+            await fetch("/api/notifications/read", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ all: true }),

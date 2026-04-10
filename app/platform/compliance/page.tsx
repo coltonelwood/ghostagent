@@ -13,25 +13,25 @@ const FRAMEWORKS = [
     code: "eu_ai_act",
     name: "EU AI Act",
     description: "European Union AI regulation effective August 2026",
-    icon: "🇪🇺",
+    abbr: "EU", color: "bg-violet-900/40 text-violet-300",
   },
   {
     code: "soc2_ai",
     name: "SOC 2 AI Controls",
     description: "SOC 2 controls relevant to AI systems",
-    icon: "🛡️",
+    abbr: "S2", color: "bg-blue-900/40 text-blue-300",
   },
   {
     code: "iso42001",
     name: "ISO/IEC 42001",
     description: "International AI management system standard",
-    icon: "📋",
+    abbr: "ISO", color: "bg-indigo-900/40 text-indigo-300",
   },
   {
     code: "nist_ai_rmf",
     name: "NIST AI RMF",
     description: "NIST AI Risk Management Framework",
-    icon: "🏛️",
+    abbr: "RMF", color: "bg-slate-900/40 text-slate-300",
   },
 ];
 
@@ -112,13 +112,23 @@ export default function CompliancePage() {
     fetch("/api/compliance")
       .then((r) => r.json())
       .then((d) => {
-        setData(
-          d.data ?? {
-            overall_score: 0,
-            frameworks: [],
-            top_gaps: [],
-          }
-        );
+        const raw = d.data;
+        if (!raw) { setData({ overall_score: 0, frameworks: [], top_gaps: [] }); return; }
+        // Normalize API shape (overallScore) to page shape (overall_score)
+        // Also derive compliant_controls / non_compliant_controls / total_controls from controls array
+        const normalized = {
+          overall_score: raw.overallScore ?? raw.overall_score ?? 0,
+          frameworks: (raw.frameworks ?? []).map((fw: { code: string; name: string; score: number; controls?: Array<{status: string; required: boolean}>; gaps?: unknown[] }) => ({
+            code: fw.code,
+            name: fw.name,
+            score: fw.score ?? 0,
+            total_controls: fw.controls?.length ?? 0,
+            compliant_controls: fw.controls?.filter((c) => c.status === "compliant").length ?? 0,
+            non_compliant_controls: fw.controls?.filter((c) => c.status === "non_compliant").length ?? 0,
+          })),
+          top_gaps: [],
+        };
+        setData(normalized);
       })
       .catch(() => {
         setData({ overall_score: 0, frameworks: [], top_gaps: [] });
@@ -219,7 +229,7 @@ export default function CompliancePage() {
             <Card key={fw.code} className="hover:border-primary/50 transition-colors">
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
-                  <span className="text-2xl">{fw.icon}</span>
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${(fw as unknown as {color: string}).color}`}>{(fw as unknown as {abbr: string}).abbr}</div>
                   <div>
                     <CardTitle className="text-base">{fw.name}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-0.5">{fw.description}</p>
