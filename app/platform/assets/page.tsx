@@ -306,7 +306,7 @@ export default function AssetsPage() {
       {total > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * 20 + 1}--{Math.min(page * 20, total)} of{" "}
+            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of{" "}
             {total} assets
           </p>
           <div className="flex items-center gap-2">

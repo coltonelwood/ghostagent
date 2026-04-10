@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, XCircle, HelpCircle, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -111,10 +112,10 @@ export default function FrameworkDetailPage({ params }: { params: Promise<{ fram
         if (d.data?.controls) {
           const states: Record<string, ControlState> = {};
           for (const c of d.data.controls) {
-            states[c.control_id] = {
+            states[c.controlId] = {
               status: c.status ?? "not_assessed",
-              asset_count: c.asset_count ?? 0,
-              assets: c.assets ?? [],
+              asset_count: c.assetCount ?? 0,
+              assets: c.affectedAssets ?? [],
             };
           }
           setControlStates(states);
@@ -134,12 +135,14 @@ export default function FrameworkDetailPage({ params }: { params: Promise<{ fram
         assets: prev[controlId]?.assets ?? [],
       },
     }));
-    // Persist to API (fire-and-forget)
+    // Persist assessment to API
     fetch(`/api/compliance/${framework}/controls/${controlId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
-    }).catch(() => {});
+    }).then((r) => {
+      if (!r.ok) toast.error("Failed to save assessment — check your connection");
+    }).catch(() => toast.error("Failed to save assessment"));
   }
 
   if (!meta) {

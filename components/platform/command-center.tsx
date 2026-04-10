@@ -234,7 +234,7 @@ export function CommandCenterDashboard({
     return (
       <div className="space-y-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Command Center</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
           <p className="text-muted-foreground text-sm mt-1">Your AI asset landscape will appear here once you connect a source.</p>
         </div>
 

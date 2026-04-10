@@ -98,7 +98,7 @@ export default async function ScanDetailPage({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Agents Found
+              AI Assets Found
             </CardTitle>
           </CardHeader>
           <CardContent>
