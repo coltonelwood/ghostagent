@@ -49,7 +49,7 @@ export default function TeamPage() {
     setInviting(true);
     setError("");
 
-    const res = await fetch("/api/org/members", {
+    const res = await fetch("/api/org/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, role }),

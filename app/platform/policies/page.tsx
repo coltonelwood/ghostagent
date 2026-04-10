@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Plus, Shield, Play, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,8 +48,19 @@ export default function PoliciesPage() {
   async function runPolicy(policyId: string) {
     setRunning(policyId);
     try {
-      await fetch(`/api/policies/${policyId}/run`, { method: "POST" });
+      const res = await fetch(`/api/policies/${policyId}/run`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed to run policy");
+      } else {
+        const violations = data.data?.violations_found ?? 0;
+        toast.success(violations > 0
+          ? `Policy evaluated — ${violations} violation${violations !== 1 ? "s" : ""} found`
+          : "Policy evaluated — no violations found");
+      }
       load();
+    } catch {
+      toast.error("Failed to run policy");
     } finally {
       setRunning(null);
     }
@@ -57,14 +69,18 @@ export default function PoliciesPage() {
   async function toggleEnabled(policy: Policy) {
     setToggling(policy.id);
     try {
-      await fetch(`/api/policies/${policy.id}`, {
+      const res = await fetch(`/api/policies/${policy.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: !policy.enabled }),
       });
+      if (!res.ok) { toast.error("Failed to update policy"); return; }
       setPolicies((prev) =>
         prev.map((p) => (p.id === policy.id ? { ...p, enabled: !p.enabled } : p))
       );
+      toast.success(policy.enabled ? "Policy disabled" : "Policy enabled");
+    } catch {
+      toast.error("Failed to update policy");
     } finally {
       setToggling(null);
     }
@@ -74,8 +90,12 @@ export default function PoliciesPage() {
     if (!confirm("Delete this policy? All violations will also be removed.")) return;
     setDeleting(policyId);
     try {
-      await fetch(`/api/policies/${policyId}`, { method: "DELETE" });
+      const res = await fetch(`/api/policies/${policyId}`, { method: "DELETE" });
+      if (!res.ok) { toast.error("Failed to delete policy"); return; }
       setPolicies((prev) => prev.filter((p) => p.id !== policyId));
+      toast.success("Policy deleted");
+    } catch {
+      toast.error("Failed to delete policy");
     } finally {
       setDeleting(null);
     }

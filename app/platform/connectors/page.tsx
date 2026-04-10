@@ -111,7 +111,7 @@ export default function ConnectorsPage() {
     fetch("/api/connectors")
       .then((r) => r.json())
       .then((res) => setConnectors(res.data ?? []))
-      .catch(() => {})
+      .catch(() => { setLoading(false); })
       .finally(() => setLoading(false));
   }, []);
 
