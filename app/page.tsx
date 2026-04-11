@@ -1,66 +1,134 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import {
+  ArrowRight,
+  ShieldAlert,
+  UserX,
+  FileWarning,
+  Database,
+  Shield,
+  ClipboardCheck,
+  Plug,
+  Activity,
+  CheckCircle2,
+  Lock,
+} from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-// ─── DATA ──────────────────────────────────────────────────────────────────
+// --------------------------------------------------------------------------
+// Data
+// --------------------------------------------------------------------------
 
 const CONNECTORS = [
-  { name: "GitHub",    abbr: "GH",  category: "Code",       live: true  },
-  { name: "GitLab",    abbr: "GL",  category: "Code",       live: true  },
-  { name: "AWS",       abbr: "AWS", category: "Cloud",      live: true  },
-  { name: "Azure",     abbr: "AZ",  category: "Cloud",      live: false },
-  { name: "GCP",       abbr: "GCP", category: "Cloud",      live: false },
-  { name: "Zapier",    abbr: "ZAP", category: "Automation", live: true  },
-  { name: "n8n",       abbr: "n8n", category: "Automation", live: true  },
-  { name: "Make",      abbr: "MK",  category: "Automation", live: false },
-  { name: "BambooHR",  abbr: "BHR", category: "HR",         live: true  },
-  { name: "Rippling",  abbr: "RP",  category: "HR",         live: true  },
-  { name: "Workday",   abbr: "WD",  category: "HR",         live: false },
-  { name: "Bitbucket", abbr: "BB",  category: "Code",       live: false },
+  "GitHub",
+  "GitLab",
+  "AWS",
+  "Azure",
+  "GCP",
+  "Zapier",
+  "n8n",
+  "Make",
+  "BambooHR",
+  "Rippling",
+];
+
+const FRAMEWORKS = [
+  { abbr: "SOC 2", desc: "Map findings to CC6.6, CC7.1, CC7.2, CC8.1" },
+  { abbr: "HIPAA", desc: "Flag PHI exposure and missing BAAs" },
+  { abbr: "EU AI Act", desc: "Evidence for high-risk system documentation" },
+  { abbr: "ISO 42001", desc: "Governance, impact, and accountability artifacts" },
+];
+
+const PROBLEMS = [
+  {
+    icon: UserX,
+    title: "Unowned AI agents",
+    body: "Scripts and services still running in production — connected to APIs, customer data, and payment systems — with no owner on record. They don't appear in any inventory.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "Silent PHI exposure",
+    body: "LLM integrations may be processing patient data without documented oversight. A missing BAA or unreviewed integration creates exposure you can't see.",
+  },
+  {
+    icon: FileWarning,
+    title: "Compliance gaps",
+    body: "SOC 2, HIPAA, and EU AI Act assessments now include questions about AI systems. Most engineering teams don't have a complete inventory ready.",
+  },
 ];
 
 const STEPS = [
   {
     n: "01",
-    title: "Connect your sources",
-    body: "Link GitHub, GitLab, AWS, Zapier, n8n, and your HR systems in minutes. Connector credentials are encrypted with AES-256-GCM before storage and are not persisted in plaintext.",
+    title: "Connect sources",
+    body: "Link GitHub, GitLab, AWS, Zapier, n8n, and HR systems. Credentials are encrypted with AES-256-GCM before storage and never returned to the client.",
   },
   {
     n: "02",
-    title: "Surface undocumented AI systems",
-    body: "Nexus scans connected sources for LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services — surfacing assets that may not appear in any existing inventory.",
+    title: "Discover AI systems",
+    body: "Nexus scans connected sources for LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services.",
   },
   {
     n: "03",
-    title: "Identify who owns what",
-    body: "Cross-reference your HR data to find current owners. When engineers leave, their AI systems are automatically flagged as unowned and escalated to the right team.",
+    title: "Identify owners",
+    body: "Cross-reference HR data to find current owners. When engineers leave, their AI systems are flagged as unowned and escalated to the right team.",
   },
   {
     n: "04",
-    title: "Set rules. Get alerted. Stay covered.",
-    body: "Define ownership requirements, PHI handling rules, and risk thresholds. When something violates a rule, Nexus creates a task, sends an alert, and logs it for audit review.",
+    title: "Enforce policies",
+    body: "Define ownership requirements, PHI handling rules, and risk thresholds. Violations create tasks, send alerts, and land in the audit log.",
   },
 ];
 
-const FRAMEWORKS = [
-  { name: "HIPAA",     abbr: "H",   color: "bg-red-900/40 text-red-300",    desc: "Flags LLM integrations that may be processing patient data without documented oversight — supporting your team in identifying potential PHI exposure risks." },
-  { name: "SOC 2",    abbr: "S2",  color: "bg-blue-900/40 text-blue-300",   desc: "Helps produce the AI system inventory many SOC 2 Type II auditors expect. Findings reference CC6.6, CC7.1, CC7.2, and CC8.1 as applicable context." },
-  { name: "EU AI Act",abbr: "EU",  color: "bg-violet-900/40 text-violet-300",desc: "Supports alignment with EU AI Act documentation requirements for high-risk systems — including risk categorization, oversight, and technical documentation (Articles 9–17)." },
-  { name: "ISO 42001",abbr: "ISO", color: "bg-indigo-900/40 text-indigo-300",desc: "Helps support ISO/IEC 42001 controls: governance documentation, risk identification, impact assessment, and accountability tracking for AI systems." },
+const MODULES = [
+  {
+    icon: Database,
+    title: "Asset registry",
+    body: "Every AI system Nexus discovers, with ownership, risk score, environment, and compliance tags.",
+  },
+  {
+    icon: Activity,
+    title: "Risk engine",
+    body: "Heuristic + LLM classification with explainable scoring. Every risk has a reason, not just a number.",
+  },
+  {
+    icon: UserX,
+    title: "Ownership engine",
+    body: "HR-cross-referenced owner detection. Automatically flags orphaned assets when engineers depart.",
+  },
+  {
+    icon: Shield,
+    title: "Policy engine",
+    body: "Visual condition builder. Trigger tasks, alerts, or quarantine when rules match.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Compliance reporting",
+    body: "Findings mapped to SOC 2, HIPAA, EU AI Act, and ISO 42001 controls. Export audit-ready evidence.",
+  },
+  {
+    icon: Plug,
+    title: "Connector framework",
+    body: "Ten integrations out of the box across code, cloud, automation, and HR — plus a custom SDK.",
+  },
 ];
 
 const TESTIMONIALS = [
   {
-    quote: "First scan found 14 AI integrations we had no record of. Three were actively processing customer data with no owner - their authors had left the company months earlier.",
+    quote:
+      "First scan found 14 AI integrations we had no record of. Three were actively processing customer data with no owner — their authors had left the company months earlier.",
     name: "VP of Engineering",
     co: "Series B fintech, 180 engineers",
   },
   {
-    quote: "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Nexus and had a structured report to share in under an hour. That conversation went a lot better than it would have otherwise.",
+    quote:
+      "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Nexus and had a structured report to share in under an hour. That conversation went a lot better than it would have otherwise.",
     name: "Head of Security",
     co: "Healthcare SaaS, 120 employees",
   },
   {
-    quote: "We had a spreadsheet. It was always out of date. Now Nexus just updates it automatically whenever a new AI integration gets pushed.",
+    quote:
+      "We had a spreadsheet. It was always out of date. Now Nexus just updates it automatically whenever a new AI integration gets pushed.",
     name: "Engineering Manager",
     co: "Legal tech platform, 90 engineers",
   },
@@ -70,8 +138,8 @@ const PLANS = [
   {
     name: "Starter",
     price: "$499",
-    period: "/mo",
-    desc: "For teams starting their AI governance program.",
+    period: "/month",
+    description: "For teams starting an AI governance program.",
     features: [
       "Up to 3 connectors",
       "500 AI assets",
@@ -80,14 +148,14 @@ const PLANS = [
       "Email alerts",
       "API access",
     ],
-    cta: "Start Free Trial",
+    cta: "Start free trial",
     highlighted: false,
   },
   {
     name: "Professional",
     price: "$2,500",
-    period: "/mo",
-    desc: "For companies under active compliance pressure.",
+    period: "/month",
+    description: "For companies under active compliance pressure.",
     features: [
       "Unlimited connectors",
       "Unlimited assets",
@@ -97,14 +165,14 @@ const PLANS = [
       "Audit log export",
       "Priority support",
     ],
-    cta: "Start Free Trial",
+    cta: "Start free trial",
     highlighted: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
     period: "",
-    desc: "For large organizations with complex requirements.",
+    description: "For large organizations with complex requirements.",
     features: [
       "Multi-org management",
       "SSO / SAML",
@@ -113,314 +181,269 @@ const PLANS = [
       "Uptime SLA",
       "Security review available",
     ],
-    cta: "Talk to Sales",
+    cta: "Talk to sales",
     highlighted: false,
   },
 ];
 
-// ─── PAGE ──────────────────────────────────────────────────────────────────
+// --------------------------------------------------------------------------
+// Product screenshot mock (rendered in CSS so we don't need an image asset)
+// --------------------------------------------------------------------------
+
+function ProductScreenshot() {
+  return (
+    <div className="relative rounded-xl border border-border bg-card p-4 shadow-xl">
+      <div className="flex items-center gap-1.5 border-b border-border pb-3">
+        <div className="size-2 rounded-full bg-destructive/60" />
+        <div className="size-2 rounded-full bg-warning/60" />
+        <div className="size-2 rounded-full bg-success/60" />
+        <div className="mx-auto rounded-sm bg-muted px-3 py-0.5 font-mono text-[10px] text-muted-foreground">
+          app.nexus.io / platform
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">Overview</h3>
+            <p className="text-[10px] text-muted-foreground">
+              AI asset posture across 6 connected sources
+            </p>
+          </div>
+          <div className="flex gap-1">
+            <div className="h-5 rounded bg-muted px-2 text-[9px] leading-5">7d</div>
+            <div className="h-5 rounded bg-primary/10 px-2 text-[9px] leading-5 text-primary">
+              30d
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { l: "Total assets", v: "247", tone: "text-foreground" },
+            { l: "Critical", v: "14", tone: "text-destructive" },
+            { l: "Orphaned", v: "6", tone: "text-warning" },
+            { l: "Violations", v: "9", tone: "text-warning" },
+          ].map((s) => (
+            <div
+              key={s.l}
+              className="rounded-md border border-border bg-muted/30 p-2"
+            >
+              <p className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                {s.l}
+              </p>
+              <p className={cn("mt-1 text-lg font-semibold nx-tabular", s.tone)}>
+                {s.v}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-md border border-border bg-muted/30 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Risk distribution
+          </p>
+          <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full bg-destructive" style={{ width: "24%" }} />
+            <div className="h-full bg-warning" style={{ width: "36%" }} />
+            <div className="h-full bg-info" style={{ width: "28%" }} />
+            <div className="h-full bg-success" style={{ width: "12%" }} />
+          </div>
+          <div className="mt-2 flex gap-3 text-[9px]">
+            {[
+              { label: "Critical", count: 14, dot: "bg-destructive" },
+              { label: "High", count: 52, dot: "bg-warning" },
+              { label: "Medium", count: 68, dot: "bg-info" },
+              { label: "Low", count: 113, dot: "bg-success" },
+            ].map((r) => (
+              <div key={r.label} className="flex items-center gap-1">
+                <span className={cn("size-1.5 rounded-full", r.dot)} />
+                <span className="text-muted-foreground">{r.label}</span>
+                <span className="font-semibold nx-tabular">{r.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border">
+          {[
+            {
+              name: "claims-fraud-v3",
+              owner: "unassigned",
+              risk: "Critical",
+              tone: "text-destructive",
+              dot: "bg-destructive",
+            },
+            {
+              name: "nlu-triage-bert",
+              owner: "achen (inactive)",
+              risk: "Critical",
+              tone: "text-destructive",
+              dot: "bg-destructive",
+            },
+            {
+              name: "ai-coding-suggestions",
+              owner: "schen",
+              risk: "High",
+              tone: "text-warning",
+              dot: "bg-warning",
+            },
+          ].map((row, i) => (
+            <div
+              key={row.name}
+              className={cn(
+                "flex items-center gap-3 px-2.5 py-2 text-[10px]",
+                i > 0 && "border-t border-border",
+              )}
+            >
+              <span className={cn("size-1.5 rounded-full", row.dot)} />
+              <span className="flex-1 truncate font-medium">{row.name}</span>
+              <span className="hidden w-24 truncate text-muted-foreground sm:inline">
+                {row.owner}
+              </span>
+              <span className={cn("font-semibold", row.tone)}>{row.risk}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Page
+// --------------------------------------------------------------------------
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#07070c] text-white antialiased">
-
-      {/* ── NAV ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#07070c]/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          {/* Logo */}
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Nav */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-violet-700 shadow-lg shadow-violet-900/40">
-              <span className="text-sm font-bold tracking-tight text-white">N</span>
+            <div className="flex size-7 items-center justify-center rounded bg-primary">
+              <span className="text-xs font-semibold text-primary-foreground">
+                N
+              </span>
             </div>
-            <span className="text-base font-semibold tracking-tight">Nexus</span>
-            <span className="hidden sm:inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest text-white/40">
-              AI Asset Management
-            </span>
+            <span className="text-[15px] font-semibold tracking-tight">Nexus</span>
           </div>
 
-          {/* Nav links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-white/50">
-            <a href="#platform" className="hover:text-white transition-colors duration-150">Platform</a>
-            <a href="#connectors" className="hover:text-white transition-colors duration-150">Connectors</a>
-            <a href="#compliance" className="hover:text-white transition-colors duration-150">Compliance</a>
-            <a href="#pricing" className="hover:text-white transition-colors duration-150">Pricing</a>
+          <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
+            <a href="#product" className="hover:text-foreground transition-colors">
+              Product
+            </a>
+            <a href="#connectors" className="hover:text-foreground transition-colors">
+              Connectors
+            </a>
+            <a href="#compliance" className="hover:text-foreground transition-colors">
+              Compliance
+            </a>
+            <a href="#pricing" className="hover:text-foreground transition-colors">
+              Pricing
+            </a>
           </nav>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="hidden sm:block text-sm font-medium text-white/50 hover:text-white transition-colors duration-150">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/auth/login"
+              className="hidden text-xs font-medium text-muted-foreground hover:text-foreground sm:inline"
+            >
               Sign in
             </Link>
-            <Link href="/demo">
-              <button className="text-sm font-medium text-white/70 hover:text-white border border-white/10 hover:border-white/20 rounded-lg px-4 py-2 transition-all duration-150">
-                View demo
-              </button>
+            <Link
+              href="/demo"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              View demo
             </Link>
-            <Link href="/auth/login">
-              <button className="text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-lg px-4 py-2 transition-colors duration-150 shadow-lg shadow-violet-900/30">
-                Get started →
-              </button>
+            <Link
+              href="/auth/login"
+              className={buttonVariants({ size: "sm" })}
+            >
+              Start free trial
+              <ArrowRight className="size-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* ── HERO ────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Background glow */}
-        <div className="pointer-events-none absolute inset-0 flex items-start justify-center">
-          <div className="h-[600px] w-[1000px] rounded-full bg-violet-600/10 blur-[120px] -translate-y-1/3" />
-        </div>
-
-        <div className="relative mx-auto max-w-5xl px-6 pt-28 pb-24 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-4 py-1.5 text-sm text-violet-300 mb-8">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-violet-400 animate-pulse" />
-            Maps findings to HIPAA, SOC 2, EU AI Act, and ISO 42001 controls
-          </div>
-
-          <h1 className="text-5xl sm:text-[72px] font-bold tracking-tight leading-[1.04] text-white">
-            Your company runs on AI.
-            <br />
-            <span className="bg-gradient-to-r from-violet-400 to-violet-200 bg-clip-text text-transparent">
-              Do you know what&apos;s running?
-            </span>
-          </h1>
-
-          <p className="mx-auto mt-7 max-w-2xl text-xl text-white/50 leading-relaxed font-light">
-            Nexus scans your connected sources to surface AI agents, automations, and LLM
-            integrations your team may not have fully inventoried — then assigns ownership,
-            scores risk, and helps you enforce governance policy.
-          </p>
-
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/auth/login">
-              <button className="h-12 px-8 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-base transition-colors shadow-xl shadow-violet-900/40">
-                Start free trial →
-              </button>
-            </Link>
-            <Link href="/demo">
-              <button className="h-12 px-8 rounded-xl border border-white/10 hover:border-white/20 text-white/80 hover:text-white font-medium text-base transition-all">
+      {/* Hero */}
+      <section className="relative border-b border-border">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-5 lg:py-24">
+          <div className="space-y-6 lg:col-span-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-primary" />
+              AI governance, control plane
+            </div>
+            <h1 className="text-[2.5rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
+              Know every AI system running inside your company.
+            </h1>
+            <p className="max-w-xl text-base text-muted-foreground leading-relaxed">
+              Nexus scans your code, cloud, and automation stack to surface AI
+              agents, LLM integrations, and ML services — then assigns ownership,
+              scores risk, and maps findings to the compliance frameworks your
+              auditors care about.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Link
+                href="/auth/login"
+                className={cn(buttonVariants({ size: "lg" }), "h-11 px-6")}
+              >
+                Start free trial
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                href="/demo"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "lg" }),
+                  "h-11 px-6",
+                )}
+              >
                 See a live scan
-              </button>
-            </Link>
-          </div>
-          <p className="mt-4 text-sm text-white/25">No credit card required · Connects in under 5 minutes · Cancel anytime</p>
-        </div>
-      </section>
-
-      {/* ── TRUST BAR ───────────────────────────────────────────────────── */}
-      <div className="border-y border-white/[0.06] bg-white/[0.015]">
-        <div className="mx-auto max-w-5xl px-6 py-5 flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
-          {[
-            { v: "10+", l: "Source connectors" },
-            { v: "4",   l: "Compliance frameworks supported" },
-            { v: "< 10 min", l: "First scan to results" },
-            { v: "AES-256", l: "Credential encryption" },
-            { v: "HIPAA", l: "PHI risk flagging" },
-          ].map((s) => (
-            <div key={s.l} className="flex items-center gap-3">
-              <span className="text-xl font-bold text-white">{s.v}</span>
-              <span className="text-sm text-white/30">{s.l}</span>
+              </Link>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── PROBLEM ─────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-6 py-28">
-        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">The problem</div>
-        <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-3xl">
-          Engineers ship AI fast.
-          <span className="text-white/30"> Nobody tracks where it goes.</span>
-        </h2>
-        <p className="mt-5 text-lg text-white/50 max-w-2xl leading-relaxed">
-          Every quarter, AI agents, LLM integrations, and ML services are added to your stack - often
-          without security review, compliance sign-off, or ownership documentation. When engineers leave,
-          their systems don&apos;t.
-        </p>
-
-        <div className="mt-14 grid sm:grid-cols-3 gap-5">
-          {[
-            {
-              dot: "bg-red-500",
-              label: "Risk: Critical",
-              labelColor: "text-red-400 bg-red-400/10 border-red-400/20",
-              title: "Unowned AI agents",
-              body: "Scripts and services still running in production - connected to your APIs, customer data, and payment systems - with no owner on record. They don\'t appear in any inventory.",
-            },
-            {
-              dot: "bg-red-500",
-              label: "Risk: Critical",
-              labelColor: "text-red-400 bg-red-400/10 border-red-400/20",
-              title: "Silent PHI exposure",
-              body: "LLM integrations that may be processing patient records or health data without documented oversight — creating potential exposure if a BAA hasn\'t been established or if the integration wasn\'t security-reviewed.",
-            },
-            {
-              dot: "bg-orange-400",
-              label: "Risk: High",
-              labelColor: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-              title: "Compliance gaps",
-              body: "Many SOC 2, EU AI Act, and ISO 42001 assessments now include questions about AI systems. Most engineering teams don\'t have a complete inventory ready. Most compliance teams don\'t know to ask for one.",
-            },
-          ].map((item) => (
-            <div key={item.title} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-7 hover:border-white/[0.12] transition-colors">
-              <div className="flex items-start justify-between mb-5">
-                <div className={`h-2.5 w-2.5 rounded-full mt-1 ${item.dot}`} />
-                <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${item.labelColor}`}>{item.label}</span>
-              </div>
-              <h3 className="font-semibold text-white mb-2">{item.title}</h3>
-              <p className="text-sm text-white/45 leading-relaxed">{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── PLATFORM ────────────────────────────────────────────────────── */}
-      <section id="platform" className="border-y border-white/[0.06] bg-white/[0.015]">
-        <div className="mx-auto max-w-5xl px-6 py-28">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">How it works</div>
-          <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-            Four steps to knowing what's running.
-          </h2>
-          <p className="mt-5 text-lg text-white/50 max-w-2xl">
-            Most teams go from zero visibility to a complete AI asset inventory in under an hour.
-          </p>
-
-          <div className="mt-16 grid sm:grid-cols-2 gap-5">
-            {STEPS.map((step) => (
-              <div key={step.n} className="rounded-2xl border border-white/[0.07] bg-[#0d0d14] p-7">
-                <div className="font-mono text-xs font-bold text-violet-400/60 mb-4">{step.n}</div>
-                <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{step.body}</p>
-              </div>
-            ))}
+            <p className="text-xs text-muted-foreground/70">
+              No credit card required · First scan in under 5 minutes · Cancel anytime
+            </p>
           </div>
 
-          {/* Feature pills */}
-          <div className="mt-10 flex flex-wrap gap-3">
-            {[
-              "Asset Registry", "Risk Scoring", "Ownership Engine", "Policy Builder",
-              "Compliance Reports", "Audit Logs", "Alert Delivery", "SDK Integration",
-              "Drift Detection", "Orphan Alerts"
-            ].map((f) => (
-              <span key={f} className="text-xs font-medium text-white/50 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5">
-                {f}
-              </span>
-            ))}
+          <div className="lg:col-span-3">
+            <ProductScreenshot />
           </div>
         </div>
       </section>
 
-      {/* ── CONNECTORS ──────────────────────────────────────────────────── */}
-      <section id="connectors" className="mx-auto max-w-5xl px-6 py-28">
-        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Connectors</div>
-        <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-          Not just GitHub.<br />
-          <span className="text-white/30">Your entire stack.</span>
-        </h2>
-        <p className="mt-5 text-lg text-white/50 max-w-2xl">
-          AI gets shipped everywhere - in repos, cloud functions, automation platforms, and HR-connected workflows. Nexus covers all of it.
-        </p>
-
-        <div className="mt-14 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-          {CONNECTORS.map((c) => (
-            <div key={c.name} className={`rounded-xl border p-4 flex flex-col items-center gap-2 text-center transition-colors ${
-              c.live
-                ? "border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14]"
-                : "border-white/[0.04] bg-white/[0.01] opacity-40"
-            }`}>
-              <div className="h-8 w-8 rounded-lg bg-white/[0.07] flex items-center justify-center text-[10px] font-bold text-white/60">{c.abbr}</div>
-              <span className="text-xs font-medium text-white/70">{c.name}</span>
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                c.live
-                  ? "bg-emerald-400/10 text-emerald-400"
-                  : "bg-white/5 text-white/25"
-              }`}>
-                {c.live ? "Live" : "Soon"}
-              </span>
+      {/* Proof strip */}
+      <section className="border-b border-border bg-muted/20">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Maps to
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {FRAMEWORKS.map((f) => (
+                <span
+                  key={f.abbr}
+                  className="inline-flex h-6 items-center rounded-sm border border-border bg-card px-2 text-[11px] font-medium"
+                >
+                  {f.abbr}
+                </span>
+              ))}
             </div>
-          ))}
-        </div>
-
-        <div className="mt-8 p-5 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04]">
-          <p className="text-sm text-white/60">
-            <span className="font-semibold text-violet-300">Custom connector SDK</span> - instrument any internal tool or proprietary system. Available on Professional and Enterprise plans.
-          </p>
-        </div>
-      </section>
-
-      {/* ── COMPLIANCE ──────────────────────────────────────────────────── */}
-      <section id="compliance" className="border-y border-white/[0.06] bg-white/[0.015]">
-        <div className="mx-auto max-w-5xl px-6 py-28">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Compliance</div>
-          <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-            Auditors are asking about AI.
-            <span className="text-white/30"> Now you have a starting point.</span>
-          </h2>
-          <p className="mt-5 text-lg text-white/50 max-w-2xl">
-            Nexus maps findings to the controls most commonly referenced in compliance frameworks your security team works with — giving you structured evidence to start a conversation, not a guarantee of certification.
-          </p>
-
-          <div className="mt-14 grid sm:grid-cols-2 gap-5">
-            {FRAMEWORKS.map((f) => (
-              <div key={f.name} className="rounded-2xl border border-white/[0.07] bg-[#0d0d14] p-7 flex gap-5">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${f.color}`}>{f.abbr}</div>
-                <div>
-                  <h3 className="font-semibold text-white mb-2">{f.name}</h3>
-                  <p className="text-sm text-white/45 leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
-            ))}
           </div>
-
-          <div className="mt-10 grid sm:grid-cols-3 gap-5">
-            {[
-              { title: "Automated evidence collection", body: "Every scan generates audit-ready evidence. Export structured reports for your assessors." },
-              { title: "Control mapping", body: "Findings are automatically mapped to the specific controls they violate - not just flagged generically." },
-              { title: "Gap tracking", body: "Track your control coverage over time. See which items have been addressed and which still need attention." },
-            ].map((item) => (
-              <div key={item.title} className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-5">
-                <h4 className="text-sm font-semibold text-white mb-2">{item.title}</h4>
-                <p className="text-sm text-white/40 leading-relaxed">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-6 py-28">
-        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">What teams say</div>
-        <h2 className="text-4xl font-bold max-w-xl">The first scan always finds something.</h2>
-
-        <div className="mt-14 grid sm:grid-cols-3 gap-5">
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-7 flex flex-col gap-6">
-              <p className="text-white/60 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
-              <div>
-                <div className="text-sm font-semibold text-white">{t.name}</div>
-                <div className="text-xs text-white/30 mt-0.5">{t.co}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── SECURITY ────────────────────────────────────────────────────── */}
-      <section className="border-y border-white/[0.06] bg-white/[0.015]">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
-            <div>
-              <div className="mb-3 text-sm font-semibold uppercase tracking-widest text-violet-400">Security</div>
-              <h2 className="text-2xl font-bold">Security that holds up to scrutiny.</h2>
-              <p className="mt-2 text-white/40 max-w-lg text-sm leading-relaxed">
-                Connector credentials are encrypted with AES-256-GCM before storage and are not returned to the frontend. API access is scoped to your organization with enforced RBAC. Sensitive actions write structured audit logs. Credentials are not stored in plaintext.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3 shrink-0">
-              {["AES-256-GCM credentials", "Organization-scoped RBAC", "Full audit trail", "No plaintext secrets", "SSRF protection", "Security headers"].map((s) => (
-                <span key={s} className="text-xs text-white/50 bg-white/[0.04] border border-white/[0.07] rounded-full px-3 py-1.5">
-                  ✓ {s}
+          <div className="hidden h-6 w-px bg-border lg:block" />
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Connects to
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {CONNECTORS.map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex h-6 items-center rounded-sm border border-border bg-card px-2 text-[11px] text-muted-foreground"
+                >
+                  {c}
                 </span>
               ))}
             </div>
@@ -428,103 +451,376 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── PRICING ─────────────────────────────────────────────────────── */}
-      <section id="pricing" className="mx-auto max-w-5xl px-6 py-28">
-        <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">Pricing</div>
-        <h2 className="text-4xl sm:text-5xl font-bold leading-tight">Straightforward pricing.</h2>
-        <p className="mt-4 text-white/50 text-lg">Start with a free trial. No credit card required.</p>
+      {/* Problem */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            The problem
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Engineers ship AI faster than anyone can inventory it.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            Every quarter, new agents, LLM integrations, and ML services land
+            in production — often without security review, compliance sign-off, or
+            documented ownership. When engineers leave, their systems don&apos;t.
+          </p>
 
-        <div className="mt-14 grid sm:grid-cols-3 gap-5 items-start">
-          {PLANS.map((plan) => (
-            <div key={plan.name} className={`rounded-2xl border p-7 flex flex-col ${
-              plan.highlighted
-                ? "border-violet-500/40 bg-gradient-to-b from-violet-900/20 to-transparent"
-                : "border-white/[0.07] bg-white/[0.02]"
-            }`}>
-              {plan.highlighted && (
-                <div className="text-xs font-bold uppercase tracking-widest text-violet-400 mb-4">Most popular</div>
-              )}
-              <div className="font-bold text-lg text-white">{plan.name}</div>
-              <div className="mt-3 flex items-end gap-1">
-                <span className="text-4xl font-bold text-white">{plan.price}</span>
-                <span className="text-white/30 text-sm mb-1">{plan.period}</span>
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            {PROBLEMS.map((item) => (
+              <div
+                key={item.title}
+                className="nx-surface flex flex-col gap-3 p-5"
+              >
+                <div className="flex size-9 items-center justify-center rounded-md border border-border bg-muted/40">
+                  <item.icon className="size-4 text-muted-foreground" />
+                </div>
+                <h3 className="text-base font-semibold tracking-tight">
+                  {item.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {item.body}
+                </p>
               </div>
-              <p className="mt-2 text-sm text-white/40">{plan.desc}</p>
-              <ul className="mt-7 space-y-3 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-white/60">
-                    <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/auth/login" className="mt-8 block">
-                <button className={`w-full h-11 rounded-xl font-semibold text-sm transition-colors ${
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section id="product" className="border-b border-border bg-muted/10">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            How it works
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Four steps from zero visibility to a complete AI inventory.
+          </h2>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step) => (
+              <div
+                key={step.n}
+                className="nx-surface flex flex-col gap-3 p-5"
+              >
+                <span className="nx-mono text-[11px] font-semibold text-primary">
+                  Step {step.n}
+                </span>
+                <h3 className="text-base font-semibold tracking-tight">
+                  {step.title}
+                </h3>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  {step.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Modules */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            Product modules
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            One control plane. Six connected workflows.
+          </h2>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {MODULES.map((m) => (
+              <div
+                key={m.title}
+                className="nx-surface flex flex-col gap-3 p-5 transition-colors hover:border-border-strong"
+              >
+                <div className="flex size-9 items-center justify-center rounded-md border border-border bg-muted/40">
+                  <m.icon className="size-4 text-muted-foreground" />
+                </div>
+                <h3 className="text-base font-semibold tracking-tight">
+                  {m.title}
+                </h3>
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  {m.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Connectors detail */}
+      <section id="connectors" className="border-b border-border bg-muted/10">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            Connectors
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Cover every place AI ships — not just your repo.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            Ten integrations across code, cloud, automation, and HR. A custom
+            SDK for proprietary systems, available on Professional and Enterprise.
+          </p>
+
+          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {CONNECTORS.map((name) => (
+              <div
+                key={name}
+                className="nx-surface flex items-center gap-3 p-3"
+              >
+                <div className="flex size-8 items-center justify-center rounded-md border border-border bg-muted/40 text-[11px] font-semibold text-muted-foreground">
+                  {name.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="text-[13px] font-medium">{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Compliance */}
+      <section id="compliance" className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            Compliance
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Evidence for the frameworks your auditors actually ask about.
+          </h2>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            Nexus maps findings to specific controls across four frameworks so
+            you can hand structured evidence to your security team or your
+            assessor. Nexus does not certify compliance — it helps you prepare.
+          </p>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2">
+            {FRAMEWORKS.map((f) => (
+              <div
+                key={f.abbr}
+                className="nx-surface flex items-start gap-4 p-5"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 text-[11px] font-semibold">
+                  {f.abbr}
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-semibold tracking-tight">
+                    {f.abbr}
+                  </h3>
+                  <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                    {f.desc}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="border-b border-border bg-muted/10">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            What teams say
+          </div>
+          <h2 className="max-w-2xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            The first scan always finds something.
+          </h2>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <blockquote
+                key={t.name}
+                className="nx-surface flex flex-col gap-5 p-5"
+              >
+                <p className="flex-1 text-[13px] leading-relaxed text-foreground">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <footer>
+                  <div className="text-[13px] font-semibold">{t.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{t.co}</div>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Security */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-xl">
+              <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+                Security
+              </div>
+              <h2 className="text-3xl font-semibold leading-tight tracking-tight">
+                Security that holds up to scrutiny.
+              </h2>
+              <p className="mt-4 text-[14px] leading-relaxed text-muted-foreground">
+                Connector credentials are encrypted with AES-256-GCM before
+                storage and are never returned to the frontend. API access is
+                scoped to your organization with enforced RBAC. Sensitive
+                actions write structured audit logs.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                "AES-256-GCM credential encryption",
+                "Organization-scoped RBAC",
+                "Full audit trail",
+                "SSRF protection",
+                "Security headers + CSP",
+                "No plaintext secrets",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-[12px]"
+                >
+                  <Lock className="size-3.5 text-success" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="border-b border-border bg-muted/10">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
+            Pricing
+          </div>
+          <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Straightforward pricing. No gotchas.
+          </h2>
+
+          <div className="mt-12 grid gap-4 lg:grid-cols-3">
+            {PLANS.map((plan) => (
+              <div
+                key={plan.name}
+                className={cn(
+                  "flex flex-col gap-5 rounded-lg border p-6",
                   plan.highlighted
-                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
-                    : "bg-white/[0.06] hover:bg-white/[0.10] text-white/80"
-                }`}>
+                    ? "border-primary/40 bg-card shadow-[0_0_0_1px_var(--primary)/40]"
+                    : "border-border bg-card",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold">{plan.name}</h3>
+                  {plan.highlighted && (
+                    <span className="inline-flex h-5 items-center rounded-sm bg-primary/10 px-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      Most popular
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-semibold tracking-tight">
+                    {plan.price}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{plan.period}</span>
+                </div>
+
+                <p className="text-[13px] text-muted-foreground">{plan.description}</p>
+
+                <ul className="flex-1 space-y-2 border-t border-border pt-5">
+                  {plan.features.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-start gap-2 text-[13px] text-foreground"
+                    >
+                      <CheckCircle2 className="size-3.5 shrink-0 text-success mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link
+                  href="/auth/login"
+                  className={cn(
+                    buttonVariants({
+                      variant: plan.highlighted ? "default" : "outline",
+                      size: "lg",
+                    }),
+                    "h-10 w-full",
+                  )}
+                >
                   {plan.cta}
-                </button>
-              </Link>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-8 text-center text-sm text-white/25">
-          All plans include a 14-day free trial. No setup fees. Cancel anytime.
-        </p>
-      </section>
-
-      {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
-      <section className="border-t border-white/[0.06]">
-        <div className="relative overflow-hidden mx-auto max-w-5xl px-6 py-28 text-center">
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[400px] w-[700px] rounded-full bg-violet-600/10 blur-[100px]" />
+                </Link>
+              </div>
+            ))}
           </div>
-          <div className="relative">
-            <h2 className="text-4xl sm:text-5xl font-bold leading-tight">
-              Know what AI
-              <br />
-              is running in your company.
-            </h2>
-            <p className="mt-5 text-lg text-white/40">Connect your first source in under 5 minutes.</p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/auth/login">
-                <button className="h-12 px-10 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-base transition-colors shadow-xl shadow-violet-900/40">
-                  Start free trial →
-                </button>
-              </Link>
-              <Link href="/demo">
-                <button className="h-12 px-10 rounded-xl border border-white/10 hover:border-white/20 text-white/70 hover:text-white font-medium text-base transition-all">
-                  View a live scan
-                </button>
-              </Link>
-            </div>
-          </div>
+
+          <p className="mt-6 text-center text-xs text-muted-foreground/70">
+            All plans include a 14-day free trial. No setup fees. Cancel anytime.
+          </p>
         </div>
       </section>
 
-      {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-      <footer className="border-t border-white/[0.06]">
-        <div className="mx-auto max-w-5xl px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-6">
+      {/* Final CTA */}
+      <section className="border-b border-border">
+        <div className="mx-auto max-w-4xl px-6 py-20 text-center">
+          <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            Know what AI is running in your company.
+          </h2>
+          <p className="mt-4 text-base text-muted-foreground">
+            Connect your first source in under five minutes.
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/auth/login"
+              className={cn(buttonVariants({ size: "lg" }), "h-11 px-6")}
+            >
+              Start free trial
+              <ArrowRight className="size-4" />
+            </Link>
+            <Link
+              href="/demo"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-11 px-6",
+              )}
+            >
+              See a live scan
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer>
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-6 py-10 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2.5">
-            <div className="grid h-6 w-6 place-items-center rounded bg-violet-600">
-              <span className="text-xs font-bold text-white">N</span>
+            <div className="flex size-6 items-center justify-center rounded bg-primary">
+              <span className="text-[10px] font-semibold text-primary-foreground">
+                N
+              </span>
             </div>
-            <span className="text-sm font-semibold text-white/70">Nexus</span>
-            <span className="text-white/20 text-sm">·</span>
-            <span className="text-sm text-white/25">AI Asset Management</span>
+            <span className="text-sm font-semibold">Nexus</span>
+            <span className="text-muted-foreground/60">·</span>
+            <span className="text-xs text-muted-foreground">
+              AI Asset Management
+            </span>
           </div>
-          <div className="flex items-center gap-8 text-sm text-white/30">
-            <Link href="/demo" className="hover:text-white/60 transition-colors">Live demo</Link>
-            <Link href="/auth/login" className="hover:text-white/60 transition-colors">Sign in</Link>
-            <Link href="/auth/login" className="hover:text-white/60 transition-colors">Get started</Link>
-          </div>
-          <div className="text-xs text-white/15">© 2026 Nexus. All rights reserved.</div>
+          <nav className="flex items-center gap-6 text-xs text-muted-foreground">
+            <Link href="/demo" className="hover:text-foreground transition-colors">
+              Live demo
+            </Link>
+            <Link href="/auth/login" className="hover:text-foreground transition-colors">
+              Sign in
+            </Link>
+            <a href="#pricing" className="hover:text-foreground transition-colors">
+              Pricing
+            </a>
+          </nav>
+          <p className="text-xs text-muted-foreground/70">
+            © 2026 Nexus. All rights reserved.
+          </p>
         </div>
       </footer>
-
     </div>
   );
 }

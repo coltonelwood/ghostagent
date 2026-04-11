@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { FileBarChart, Download, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { cn } from "@/lib/utils";
 
 interface ReportMeta {
   id: string;
@@ -228,84 +228,91 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Reports</h1>
-        <p className="text-muted-foreground mt-1">
-          Generate and download compliance and risk reports
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Reports"
+        description="Generate and download compliance, risk, and ownership reports for auditors, leadership, and due diligence."
+      />
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
         {REPORTS.map((report) => {
           const lastGenerated = formatTimestamp(timestamps[report.id] ?? null);
-
           return (
-            <Card key={report.id}>
-              <CardContent className="pt-5">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">{report.icon}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{report.name}</h3>
-                      <Badge variant="outline" className="text-xs">
-                        {report.badge}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{report.description}</p>
-                    {lastGenerated && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Last generated: {lastGenerated}
-                      </p>
-                    )}
-                  </div>
+            <div
+              key={report.id}
+              className="nx-surface flex flex-col gap-4 p-5"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 text-[11px] font-semibold text-muted-foreground">
+                  {report.icon}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => generateReport(report.id)}
-                  disabled={generating === report.id}
-                >
-                  {generating === report.id ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-3.5 w-3.5 mr-1.5" />
-                      Generate Report
-                    </>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[14px] font-semibold tracking-tight">
+                      {report.name}
+                    </h3>
+                    <span className="inline-flex h-4 items-center rounded-sm border border-border bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+                      {report.badge}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                    {report.description}
+                  </p>
+                  {lastGenerated && (
+                    <p className="mt-2 text-[11px] text-muted-foreground/70">
+                      Last generated: {lastGenerated}
+                    </p>
                   )}
-                </Button>
-              </CardContent>
-            </Card>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => generateReport(report.id)}
+                disabled={generating === report.id}
+              >
+                {generating === report.id ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Generating
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-3.5" />
+                    Generate report
+                  </>
+                )}
+              </Button>
+            </div>
           );
         })}
       </div>
 
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="pt-5">
-          <div className="flex items-start gap-3">
-            <FileBarChart className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <h3 className="font-semibold">M&A Due Diligence Pack</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Full AI asset inventory for acquisition due diligence. Includes complete
-                inventory, risk assessment, ownership chain, compliance status, and executive
-                summary. Used by PE firms and corporate development teams.
-              </p>
-              <div className="flex items-center gap-3 mt-3">
-                <Badge>Enterprise Feature</Badge>
-                <Button size="sm" variant="outline">
-                  Contact Sales
-                </Button>
-              </div>
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-5">
+        <div className="flex items-start gap-3">
+          <FileBarChart className="mt-0.5 size-5 shrink-0 text-primary" />
+          <div>
+            <h3 className="text-[14px] font-semibold">
+              M&amp;A Due Diligence Pack
+            </h3>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+              Full AI asset inventory for acquisition due diligence. Includes
+              complete inventory, risk assessment, ownership chain, compliance
+              status, and executive summary. Used by PE firms and corporate
+              development teams.
+            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="inline-flex h-5 items-center rounded-sm bg-primary/10 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                Enterprise
+              </span>
+              <Button size="sm" variant="outline">
+                Contact sales
+              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Zap, ArrowRight, Loader2, Tag } from "lucide-react";
+import { ArrowRight, Loader2, Tag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LinkButton } from "@/components/ui/link-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { Organization } from "@/lib/types/platform";
 import { PLAN_LIMITS } from "@/lib/entitlements";
 
@@ -61,6 +59,8 @@ export default function BillingPage() {
   const [assetCount, setAssetCount] = useState(0);
   const [connectorCount, setConnectorCount] = useState(0);
   const [managing, setManaging] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -78,10 +78,35 @@ export default function BillingPage() {
 
   async function manageBilling() {
     setManaging(true);
-    const res = await fetch("/api/billing/portal", { method: "POST" });
-    const data = (await res.json()) as { url?: string };
-    if (data.url) window.location.href = data.url;
-    else setManaging(false);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setUpgradeError(data.error ?? "Could not open billing portal.");
+    } catch {
+      setUpgradeError("Network error. Please try again.");
+    }
+    setManaging(false);
+  }
+
+  async function upgradePlan() {
+    setUpgrading(true);
+    setUpgradeError("");
+    try {
+      const res = await fetch("/api/billing/checkout", { method: "POST" });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setUpgradeError(data.error ?? "Could not start checkout.");
+    } catch {
+      setUpgradeError("Network error. Please try again.");
+    }
+    setUpgrading(false);
   }
 
   async function applyCoupon() {
@@ -187,6 +212,9 @@ export default function BillingPage() {
               )}
             </Button>
           )}
+          {upgradeError && (
+            <p className="text-sm text-destructive">{upgradeError}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -272,14 +300,18 @@ export default function BillingPage() {
                       Contact Sales <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                     </Button>
                   ) : (
-                    <LinkButton
-                      href="/api/billing/checkout"
+                    <Button
                       size="sm"
                       className="w-full"
-                      external
+                      onClick={upgradePlan}
+                      disabled={upgrading}
                     >
-                      Upgrade <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                    </LinkButton>
+                      {upgrading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>Upgrade <ArrowRight className="h-3.5 w-3.5 ml-1.5" /></>
+                      )}
+                    </Button>
                   )}
                 </CardContent>
               </Card>

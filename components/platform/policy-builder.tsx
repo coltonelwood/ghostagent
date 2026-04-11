@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback } from "react";
 import { Plus, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,43 +124,40 @@ function ConditionGroupEditor({
   onRemove,
   depth,
 }: ConditionGroupEditorProps) {
-  const toggleOperator = useCallback(() => {
+  const toggleOperator = () => {
     onChange({ ...group, operator: group.operator === "AND" ? "OR" : "AND" });
-  }, [group, onChange]);
+  };
 
-  const addRule = useCallback(() => {
+  const addRule = () => {
     const newRule: PolicyRule = {
       field: "risk_level",
       op: "eq",
       value: "",
     };
     onChange({ ...group, rules: [...group.rules, newRule] });
-  }, [group, onChange]);
+  };
 
-  const addGroup = useCallback(() => {
+  const addGroup = () => {
     const newGroup: PolicyConditionGroup = {
       operator: "AND",
       rules: [{ field: "risk_level", op: "eq", value: "" }],
     };
     onChange({ ...group, rules: [...group.rules, newGroup] });
-  }, [group, onChange]);
+  };
 
-  const updateItem = useCallback(
-    (index: number, updated: PolicyRule | PolicyConditionGroup) => {
-      const next = [...group.rules];
-      next[index] = updated;
-      onChange({ ...group, rules: next });
-    },
-    [group, onChange]
-  );
+  const updateItem = (
+    index: number,
+    updated: PolicyRule | PolicyConditionGroup,
+  ) => {
+    const next = [...group.rules];
+    next[index] = updated;
+    onChange({ ...group, rules: next });
+  };
 
-  const removeItem = useCallback(
-    (index: number) => {
-      const next = group.rules.filter((_, i) => i !== index);
-      onChange({ ...group, rules: next });
-    },
-    [group, onChange]
-  );
+  const removeItem = (index: number) => {
+    const next = group.rules.filter((_, i) => i !== index);
+    onChange({ ...group, rules: next });
+  };
 
   return (
     <div
@@ -258,37 +254,30 @@ function RuleEditor({ rule, onChange, onRemove }: RuleEditorProps) {
   const fieldDef = getFieldDef(rule.field);
   const isNullOp = rule.op === "is_null" || rule.op === "is_not_null";
 
-  const handleFieldChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const newField = e.target.value;
-      const newOps = getOpsForField(newField);
-      const opValid = newOps.some((o) => o.value === rule.op);
-      onChange({
-        ...rule,
-        field: newField,
-        op: opValid ? rule.op : newOps[0].value,
-        value: "",
-      });
-    },
-    [rule, onChange]
-  );
+  const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newField = e.target.value;
+    const newOps = getOpsForField(newField);
+    const opValid = newOps.some((o) => o.value === rule.op);
+    onChange({
+      ...rule,
+      field: newField,
+      op: opValid ? rule.op : newOps[0].value,
+      value: "",
+    });
+  };
 
-  const handleOpChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const newOp = e.target.value as Op;
-      const nextValue =
-        newOp === "is_null" || newOp === "is_not_null" ? null : rule.value;
-      onChange({ ...rule, op: newOp, value: nextValue });
-    },
-    [rule, onChange]
-  );
+  const handleOpChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newOp = e.target.value as Op;
+    const nextValue =
+      newOp === "is_null" || newOp === "is_not_null" ? null : rule.value;
+    onChange({ ...rule, op: newOp, value: nextValue });
+  };
 
-  const handleValueChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      onChange({ ...rule, value: e.target.value });
-    },
-    [rule, onChange]
-  );
+  const handleValueChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    onChange({ ...rule, value: e.target.value });
+  };
 
   return (
     <div className="flex items-center gap-2">

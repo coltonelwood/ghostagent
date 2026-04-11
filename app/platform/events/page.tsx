@@ -3,50 +3,78 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Bell, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  CheckCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterBar, FacetDropdown } from "@/components/platform/filter-bar";
+import { eventSeverityMeta } from "@/lib/design/status";
+import { cn } from "@/lib/utils";
 import type { Event } from "@/lib/types/platform";
 
-const SEVERITY_STYLES: Record<string, string> = {
-  critical: "text-destructive",
-  high: "text-orange-500",
-  medium: "text-yellow-500",
-  low: "text-blue-500",
-  info: "text-muted-foreground",
-};
-
-const SEVERITY_ICONS: Record<string, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "🔵",
-  info: "⚪",
-};
-
 const KIND_LABELS: Record<string, string> = {
-  asset_discovered: "Asset Discovered",
-  asset_changed: "Asset Changed",
-  asset_quarantined: "Asset Quarantined",
-  owner_departed: "Owner Departed",
-  owner_orphaned: "Asset Orphaned",
-  owner_assigned: "Owner Assigned",
-  risk_increased: "Risk Increased",
-  policy_violated: "Policy Violated",
-  connector_sync_completed: "Sync Completed",
-  connector_sync_failed: "Sync Failed",
-  member_invited: "Member Invited",
+  asset_discovered: "Asset discovered",
+  asset_changed: "Asset changed",
+  asset_quarantined: "Asset quarantined",
+  owner_departed: "Owner departed",
+  owner_orphaned: "Asset orphaned",
+  owner_assigned: "Owner assigned",
+  risk_increased: "Risk increased",
+  policy_violated: "Policy violated",
+  connector_sync_completed: "Sync completed",
+  connector_sync_failed: "Sync failed",
+  member_invited: "Member invited",
 };
+
+const SEVERITY_OPTIONS = [
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+  { value: "info", label: "Info" },
+];
+
+const KIND_OPTIONS = Object.entries(KIND_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  const days = Math.floor(s / 86400);
+  if (days < 30) return `${days}d ago`;
   return new Date(date).toLocaleDateString();
+}
+
+function formatDayHeader(iso: string) {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function groupByDay(events: Event[]): Record<string, Event[]> {
+  const groups: Record<string, Event[]> = {};
+  for (const event of events) {
+    const day = new Date(event.created_at).toDateString();
+    (groups[day] ??= []).push(event);
+  }
+  return groups;
 }
 
 export default function EventsPage() {
@@ -54,10 +82,9 @@ export default function EventsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [severity, setSeverity] = useState("");
-  const [kind, setKind] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [severity, setSeverity] = useState<string[]>([]);
+  const [kinds, setKinds] = useState<string[]>([]);
   const pageSize = 50;
 
   const load = useCallback(async () => {
@@ -65,10 +92,8 @@ export default function EventsPage() {
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
-      ...(severity && { severity }),
-      ...(kind && { kind }),
-      ...(dateFrom && { from: dateFrom }),
-      ...(dateTo && { to: dateTo }),
+      ...(severity.length && { severity: severity.join(",") }),
+      ...(kinds.length && { kind: kinds.join(",") }),
     });
     try {
       const res = await fetch(`/api/events?${params}`);
@@ -80,196 +105,224 @@ export default function EventsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, severity, kind, dateFrom, dateTo]);
+  }, [page, severity, kinds]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const totalPages = Math.ceil(total / pageSize);
+  useEffect(() => {
+    setPage(1);
+  }, [search, severity, kinds]);
+
+  async function markAllRead() {
+    try {
+      await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      toast.success("All events marked as read");
+    } catch {
+      toast.error("Could not mark events as read");
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Client-side filter by search (text only; server handles the rest)
+  const visible = search
+    ? events.filter(
+        (e) =>
+          e.title.toLowerCase().includes(search.toLowerCase()) ||
+          e.body?.toLowerCase().includes(search.toLowerCase()),
+      )
+    : events;
+
+  const grouped = groupByDay(visible);
+  const dayKeys = Object.keys(grouped);
+
+  const hasFilters = search.length > 0 || severity.length > 0 || kinds.length > 0;
+
+  function clearAllFilters() {
+    setSearch("");
+    setSeverity([]);
+    setKinds([]);
+  }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Events</h1>
-          <p className="text-muted-foreground mt-1">{total} events in your organization</p>
-        </div>
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={async () => {
-            await fetch("/api/notifications/read", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ all: true }),
-            });
-          }}
-        >
-          Mark all read
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div>
-          <select
-            className="px-3 py-2 rounded-lg border text-sm bg-background"
-            value={kind}
-            onChange={(e) => {
-              setKind(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All event types</option>
-            {Object.entries(KIND_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <select
-            className="px-3 py-2 rounded-lg border text-sm bg-background"
-            value={severity}
-            onChange={(e) => {
-              setSeverity(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All severities</option>
-            {["critical", "high", "medium", "low", "info"].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 w-36 text-sm"
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 w-36 text-sm"
-          />
-        </div>
-
-        {(severity || kind || dateFrom || dateTo) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSeverity("");
-              setKind("");
-              setDateFrom("");
-              setDateTo("");
-              setPage(1);
-            }}
-          >
-            Clear filters
+    <div className="space-y-6">
+      <PageHeader
+        title="Events"
+        description="Unified feed of discoveries, ownership changes, policy violations, and connector activity."
+        meta={
+          <>
+            <span className="nx-tabular">{total}</span>
+            <span>total events</span>
+          </>
+        }
+        secondaryActions={
+          <Button variant="outline" size="sm" onClick={markAllRead}>
+            <CheckCheck className="size-3.5" />
+            Mark all read
           </Button>
-        )}
-      </div>
+        }
+      />
 
-      {/* Event list */}
-      <Card>
-        <CardContent className="pt-4">
-          {loading ? (
-            <div className="space-y-3">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
-              ))}
-            </div>
-          ) : events.length === 0 ? (
-            <div className="text-center py-16">
-              <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
-              <p className="font-medium">No events found</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {severity || kind || dateFrom || dateTo
-                  ? "Try adjusting your filters."
-                  : "Events will appear here as Nexus discovers and monitors your AI assets."}
-              </p>
-            </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        facets={
+          <>
+            <FacetDropdown
+              label="Severity"
+              options={SEVERITY_OPTIONS}
+              selected={severity}
+              onChange={setSeverity}
+            />
+            <FacetDropdown
+              label="Type"
+              options={KIND_OPTIONS}
+              selected={kinds}
+              onChange={setKinds}
+            />
+          </>
+        }
+      />
+
+      {/* Feed */}
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-16 animate-pulse rounded-lg border border-border bg-muted/30"
+            />
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="nx-surface">
+          {hasFilters ? (
+            <EmptyState
+              icon={Bell}
+              title="No events match your filters"
+              description="Try adjusting your filters or clearing them to see everything."
+              primaryAction={
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  Clear filters
+                </Button>
+              }
+            />
           ) : (
-            <div className="divide-y">
-              {events.map((event) => (
-                <div key={event.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                  <span className="text-lg leading-none mt-0.5 shrink-0">
-                    {SEVERITY_ICONS[event.severity] ?? "⚪"}
+            <EmptyState
+              icon={Bell}
+              title="No events yet"
+              description="Events appear here as Nexus discovers assets, runs policies, and observes ownership changes."
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {dayKeys.map((day) => {
+            const items = grouped[day];
+            return (
+              <section key={day} className="space-y-2">
+                <div className="sticky top-14 z-10 -mx-2 flex items-center gap-3 bg-background/95 px-2 py-1 backdrop-blur">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    {formatDayHeader(items[0].created_at)}
+                  </h2>
+                  <span className="text-[11px] text-muted-foreground/70 nx-tabular">
+                    {items.length} {items.length === 1 ? "event" : "events"}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm font-medium ${SEVERITY_STYLES[event.severity] ?? ""}`}>
-                        {event.title}
-                      </p>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {timeAgo(event.created_at)}
-                      </span>
-                    </div>
-                    {event.body && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{event.body}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <Badge variant="outline" className="text-xs">
-                        {KIND_LABELS[event.kind] ?? event.kind}
-                      </Badge>
-                      {event.asset_id && event.asset && (
-                        <Link
-                          href={`/platform/assets/${event.asset_id}`}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          {event.asset.name}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
+                  <div className="h-px flex-1 bg-border" />
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t mt-4">
-              <p className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <ul className="nx-surface divide-y divide-border">
+                  {items.map((event) => {
+                    const meta = eventSeverityMeta(event.severity);
+                    return (
+                      <li
+                        key={event.id}
+                        className={cn(
+                          "flex items-start gap-3 border-l-2 bg-card px-4 py-3",
+                          meta.borderClass,
+                        )}
+                      >
+                        <span
+                          className={cn("mt-1.5 size-2 shrink-0 rounded-full", meta.dotClass)}
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="truncate text-[13px] font-medium text-foreground">
+                              {event.title}
+                            </p>
+                            <time className="shrink-0 text-[11px] text-muted-foreground nx-tabular">
+                              {timeAgo(event.created_at)}
+                            </time>
+                          </div>
+                          {event.body && (
+                            <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-2">
+                              {event.body}
+                            </p>
+                          )}
+                          <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className={cn("font-medium capitalize", meta.textClass)}>
+                              {meta.label}
+                            </span>
+                            <span>·</span>
+                            <span>{KIND_LABELS[event.kind] ?? event.kind}</span>
+                            {event.asset_id && event.asset && (
+                              <>
+                                <span>·</span>
+                                <Link
+                                  href={`/platform/assets/${event.asset_id}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {event.asset.name}
+                                </Link>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && !loading && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5 text-xs text-muted-foreground">
+          <p className="nx-tabular">
+            Page {page} of {totalPages}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft className="size-3" />
+              Previous
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={page >= totalPages}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+              <ChevronRight className="size-3" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,21 +12,39 @@ function InviteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
-  const [state, setState] = useState<State>("loading");
+  // Derive the initial state from the token so we don't need to setState
+  // synchronously inside an effect.
+  const [state, setState] = useState<State>(token ? "loading" : "error");
   const [orgName, setOrgName] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState(
+    token ? "" : "Invalid invitation link — missing token.",
+  );
 
   useEffect(() => {
-    if (!token) { setState("error"); setErrorMsg("Invalid invitation link — missing token."); return; }
+    if (!token) return;
 
-    // Fetch invite details
+    let cancelled = false;
     fetch(`/api/invite?token=${token}`)
-      .then(r => r.json())
+      .then((r) => r.json())
       .then((d: { data?: { org_name: string }; error?: string }) => {
-        if (d.error) { setState("expired"); setErrorMsg(d.error); }
-        else { setOrgName(d.data?.org_name ?? ""); setState("accepting"); }
+        if (cancelled) return;
+        if (d.error) {
+          setState("expired");
+          setErrorMsg(d.error);
+        } else {
+          setOrgName(d.data?.org_name ?? "");
+          setState("accepting");
+        }
       })
-      .catch(() => { setState("error"); setErrorMsg("Failed to load invitation."); });
+      .catch(() => {
+        if (cancelled) return;
+        setState("error");
+        setErrorMsg("Failed to load invitation.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function accept() {

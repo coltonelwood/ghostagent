@@ -2,18 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  Plug,
   Plus,
-  CheckCircle,
-  XCircle,
-  Pause,
-  Clock,
+  Plug,
   RefreshCw,
+  ArrowRight,
+  Code,
+  Cloud,
+  Zap,
+  Users,
+  Box,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { connectorStatusMeta } from "@/lib/design/status";
+import { cn } from "@/lib/utils";
+
+// --------------------------------------------------------------------------
+// Connector metadata
+// --------------------------------------------------------------------------
 
 interface ConnectorData {
   id: string;
@@ -27,81 +35,185 @@ interface ConnectorData {
   created_at: string;
 }
 
-const CONNECTOR_INFO: Record<string, { displayName: string; category: string }> = {
-  github: { displayName: "GitHub", category: "Code" },
-  gitlab: { displayName: "GitLab", category: "Code" },
-  bitbucket: { displayName: "Bitbucket", category: "Code" },
-  aws: { displayName: "AWS", category: "Cloud" },
-  gcp: { displayName: "Google Cloud", category: "Cloud" },
-  azure: { displayName: "Azure", category: "Cloud" },
-  zapier: { displayName: "Zapier", category: "Automation" },
-  n8n: { displayName: "n8n", category: "Automation" },
-  make: { displayName: "Make", category: "Automation" },
-  rippling: { displayName: "Rippling", category: "HR" },
-  bamboohr: { displayName: "BambooHR", category: "HR" },
-  workday: { displayName: "Workday", category: "HR" },
-  sdk: { displayName: "Internal SDK", category: "Internal" },
-  slack: { displayName: "Slack", category: "Internal" },
-  webhook: { displayName: "Webhook", category: "Internal" },
+interface ConnectorKind {
+  displayName: string;
+  category: "Code" | "Cloud" | "Automation" | "HR" | "Internal";
+  blurb: string;
+}
+
+const CONNECTOR_INFO: Record<string, ConnectorKind> = {
+  github: {
+    displayName: "GitHub",
+    category: "Code",
+    blurb: "Scan repositories for AI-related code and integrations.",
+  },
+  gitlab: {
+    displayName: "GitLab",
+    category: "Code",
+    blurb: "Scan GitLab projects for AI-related code and pipelines.",
+  },
+  bitbucket: {
+    displayName: "Bitbucket",
+    category: "Code",
+    blurb: "Scan Bitbucket repositories for AI agent code.",
+  },
+  aws: {
+    displayName: "AWS",
+    category: "Cloud",
+    blurb: "Discover Lambda, Bedrock, SageMaker, and Step Functions usage.",
+  },
+  gcp: {
+    displayName: "Google Cloud",
+    category: "Cloud",
+    blurb: "Discover Cloud Functions, Vertex AI, and Cloud Run workloads.",
+  },
+  azure: {
+    displayName: "Azure",
+    category: "Cloud",
+    blurb: "Discover Azure Functions, OpenAI, and Logic Apps.",
+  },
+  zapier: {
+    displayName: "Zapier",
+    category: "Automation",
+    blurb: "Discover AI-powered Zaps across your Zapier account.",
+  },
+  n8n: {
+    displayName: "n8n",
+    category: "Automation",
+    blurb: "Discover AI workflows in your n8n instance.",
+  },
+  make: {
+    displayName: "Make",
+    category: "Automation",
+    blurb: "Discover AI scenarios in your Make (Integromat) account.",
+  },
+  rippling: {
+    displayName: "Rippling",
+    category: "HR",
+    blurb: "Cross-reference employee data for ownership verification.",
+  },
+  bamboohr: {
+    displayName: "BambooHR",
+    category: "HR",
+    blurb: "Cross-reference employee data for ownership verification.",
+  },
+  workday: {
+    displayName: "Workday",
+    category: "HR",
+    blurb: "Cross-reference employee data for ownership verification.",
+  },
+  sdk: {
+    displayName: "Internal SDK",
+    category: "Internal",
+    blurb: "Self-report AI systems from your own codebase.",
+  },
+  slack: {
+    displayName: "Slack",
+    category: "Internal",
+    blurb: "Route alerts and violations into Slack channels.",
+  },
+  webhook: {
+    displayName: "Webhook",
+    category: "Internal",
+    blurb: "Pipe events to any HTTPS endpoint.",
+  },
+};
+
+const CATEGORY_ICON: Record<ConnectorKind["category"], React.ComponentType<{ className?: string }>> = {
+  Code: Code,
+  Cloud: Cloud,
+  Automation: Zap,
+  HR: Users,
+  Internal: Box,
 };
 
 const ALL_KINDS = Object.keys(CONNECTOR_INFO);
 
-const STATUS_ICON: Record<string, React.ReactNode> = {
-  active: <CheckCircle className="size-4 text-green-500" />,
-  error: <XCircle className="size-4 text-red-500" />,
-  paused: <Pause className="size-4 text-yellow-500" />,
-  pending: <Clock className="size-4 text-muted-foreground" />,
-};
+// --------------------------------------------------------------------------
+// Connector card (connected)
+// --------------------------------------------------------------------------
 
-function ConnectorCard({ connector }: { connector: ConnectorData }) {
+function ConnectedCard({ connector }: { connector: ConnectorData }) {
   const info = CONNECTOR_INFO[connector.kind];
+  const meta = connectorStatusMeta(connector.status);
+  const Icon = info ? CATEGORY_ICON[info.category] : Plug;
+
   return (
-    <Link href={`/platform/connectors/${connector.id}`}>
-      <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-        <CardContent className="flex flex-col gap-3 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Plug className="size-5 text-primary" />
-              <span className="font-medium">
-                {connector.name || info?.displayName || connector.kind}
-              </span>
-            </div>
-            {STATUS_ICON[connector.status] ?? null}
+    <Link
+      href={`/platform/connectors/${connector.id}`}
+      className="nx-surface group flex flex-col gap-4 p-4 transition-colors hover:border-border-strong"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40">
+            <Icon className="size-4 text-muted-foreground" />
           </div>
-          <div className="flex flex-wrap gap-1">
-            <Badge variant="outline">{info?.category ?? "Other"}</Badge>
-            <Badge variant="outline" className="capitalize">
-              {connector.status}
-            </Badge>
-          </div>
-          {connector.last_sync_at && (
-            <p className="text-xs text-muted-foreground">
-              Last sync: {new Date(connector.last_sync_at).toLocaleDateString()}
-              {connector.last_sync_asset_count !== null &&
-                ` -- ${connector.last_sync_asset_count} assets`}
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold">
+              {connector.name || info?.displayName || connector.kind}
             </p>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-[11px] text-muted-foreground">
+              {info?.category ?? "Other"}
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px]">
+          <span className={cn("size-1.5 rounded-full", meta.dotClass)} aria-hidden />
+          <span className={meta.textClass}>{meta.label}</span>
+        </span>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between border-t border-border pt-3 text-[11px] text-muted-foreground">
+        <span className="nx-tabular">
+          {connector.last_sync_asset_count ?? 0} assets
+        </span>
+        <span className="nx-tabular">
+          {connector.last_sync_at
+            ? `Synced ${formatRelative(connector.last_sync_at)}`
+            : "Not synced"}
+        </span>
+      </div>
     </Link>
   );
 }
 
-function AvailableConnectorCard({ kind }: { kind: string }) {
+// --------------------------------------------------------------------------
+// Available connector card (dashed)
+// --------------------------------------------------------------------------
+
+function AvailableCard({ kind }: { kind: string }) {
   const info = CONNECTOR_INFO[kind];
+  if (!info) return null;
+  const Icon = CATEGORY_ICON[info.category];
+
   return (
-    <Link href={`/platform/connectors/new/${kind}`}>
-      <Card className="transition-shadow hover:shadow-md cursor-pointer border-dashed h-full">
-        <CardContent className="flex flex-col items-center justify-center gap-2 p-6 text-center">
-          <Plus className="size-8 text-muted-foreground" />
-          <span className="font-medium">{info?.displayName ?? kind}</span>
-          <Badge variant="outline">{info?.category ?? "Other"}</Badge>
-        </CardContent>
-      </Card>
+    <Link
+      href={`/platform/connectors/new/${kind}`}
+      className="group flex flex-col gap-3 rounded-lg border border-dashed border-border p-4 transition-colors hover:border-border-strong hover:bg-muted/30"
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40">
+          <Icon className="size-4 text-muted-foreground" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold">{info.displayName}</p>
+          <p className="text-[11px] text-muted-foreground">{info.category}</p>
+        </div>
+      </div>
+      <p className="text-[12px] leading-snug text-muted-foreground line-clamp-2">
+        {info.blurb}
+      </p>
+      <div className="mt-auto flex items-center gap-1 text-[11px] font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+        Connect
+        <ArrowRight className="size-3" />
+      </div>
     </Link>
   );
 }
+
+// --------------------------------------------------------------------------
+// Main page
+// --------------------------------------------------------------------------
 
 export default function ConnectorsPage() {
   const [connectors, setConnectors] = useState<ConnectorData[]>([]);
@@ -111,65 +223,127 @@ export default function ConnectorsPage() {
     fetch("/api/connectors")
       .then((r) => r.json())
       .then((res) => setConnectors(res.data ?? []))
-      .catch(() => { setLoading(false); })
+      .catch(() => {
+        /* handled by error state */
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const connectedKinds = new Set(connectors.map((c) => c.kind));
-  const availableKinds = ALL_KINDS.filter((k) => !connectedKinds.has(k));
+  const available = ALL_KINDS.filter((k) => !connectedKinds.has(k));
+
+  // Group available by category
+  const grouped = available.reduce<Record<string, string[]>>((acc, kind) => {
+    const cat = CONNECTOR_INFO[kind]?.category ?? "Internal";
+    (acc[cat] ??= []).push(kind);
+    return acc;
+  }, {});
+
+  const categories: ConnectorKind["category"][] = [
+    "Code",
+    "Cloud",
+    "Automation",
+    "HR",
+    "Internal",
+  ];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Connectors</h1>
-        <p className="text-muted-foreground">
-          Connect data sources to discover and monitor AI assets across your
-          organization.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Connectors"
+        description="Link sources so Nexus can discover, classify, and monitor every AI system in your stack."
+        meta={
+          connectors.length > 0 && (
+            <>
+              <span className="nx-tabular">{connectors.length}</span>
+              <span>connected</span>
+              <span>·</span>
+              <span>{available.length} available</span>
+            </>
+          )
+        }
+      />
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="size-5 animate-spin text-muted-foreground" />
+      {/* Connected */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Connected
+          </h2>
         </div>
-      ) : (
-        <>
-          {/* Connected connectors */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Connected</h2>
-            {connectors.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Plug className="mx-auto size-10 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">
-                    No connectors yet
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Add your first connector below to start discovering AI
-                    assets.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {connectors.map((c) => (
-                  <ConnectorCard key={c.id} connector={c} />
-                ))}
-              </div>
-            )}
-          </section>
 
-          {/* Available connectors */}
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold">Available</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {availableKinds.map((kind) => (
-                <AvailableConnectorCard key={kind} kind={kind} />
-              ))}
-            </div>
-          </section>
-        </>
+        {loading ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="nx-surface h-[120px] animate-pulse bg-muted/30"
+              />
+            ))}
+          </div>
+        ) : connectors.length === 0 ? (
+          <div className="nx-surface">
+            <EmptyState
+              icon={Plug}
+              title="No sources connected yet"
+              description="Add your first connector below. Credentials are encrypted with AES-256-GCM before storage and never returned to the client."
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {connectors.map((c) => (
+              <ConnectedCard key={c.id} connector={c} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Available by category */}
+      {available.length > 0 && (
+        <section className="space-y-5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Available
+          </h2>
+
+          {categories.map((cat) => {
+            const kinds = grouped[cat];
+            if (!kinds || kinds.length === 0) return null;
+            return (
+              <div key={cat} className="space-y-2">
+                <h3 className="text-[12px] font-medium text-foreground">{cat}</h3>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {kinds.map((kind) => (
+                    <AvailableCard key={kind} kind={kind} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </section>
       )}
+
+      <p className="text-[11px] text-muted-foreground/70">
+        Connector credentials are encrypted with AES-256-GCM before storage. We
+        never return credentials to the client, and they are not included in
+        audit logs or error messages.
+      </p>
     </div>
   );
+}
+
+// --------------------------------------------------------------------------
+
+function formatRelative(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = now - then;
+  if (diff < 0) return "just now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 }

@@ -29,17 +29,24 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+  const { pathname } = request.nextUrl;
+
+  // Routes that require authentication
+  const protectedRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/platform") ||
+    pathname.startsWith("/onboarding");
+
+  if (!user && protectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from login
-  if (user && request.nextUrl.pathname === "/auth/login") {
+  // Redirect logged-in users away from the login screen
+  if (user && pathname === "/auth/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/platform";
     return NextResponse.redirect(url);
   }
 
@@ -49,6 +56,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/platform/:path*",
+    "/onboarding/:path*",
     "/scan/:path*",
     "/auth/:path*",
     // Exclude static files and API routes (Stripe webhook needs raw body)

@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect, notFound } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import Link from "next/link";
 import { ConnectorDetail } from "@/components/platform/connector-detail";
+
+export const dynamic = "force-dynamic";
 
 export default async function ConnectorDetailPage({
   params,
@@ -22,18 +25,50 @@ export default async function ConnectorDetailPage({
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const res = await fetch(`${baseUrl}/api/connectors/${id}`, {
-    headers: { cookie: cookieHeader },
-    cache: "no-store",
-  });
+  const hdrs = await headers();
+  const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
+  const proto = hdrs.get("x-forwarded-proto") ?? "https";
+  const baseUrl = host
+    ? `${proto}://${host}`
+    : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  if (!res.ok) {
-    if (res.status === 404) notFound();
-    throw new Error("Failed to fetch connector");
+  let connector = null;
+  let fetchError = false;
+
+  try {
+    const res = await fetch(`${baseUrl}/api/connectors/${id}`, {
+      headers: { cookie: cookieHeader },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      if (res.status === 404) notFound();
+      fetchError = true;
+    } else {
+      const body = await res.json();
+      connector = body.data;
+    }
+  } catch {
+    fetchError = true;
   }
 
-  const { data: connector } = await res.json();
+  if (fetchError || !connector) {
+    return (
+      <div className="mx-auto max-w-lg text-center py-20 space-y-4">
+        <h2 className="text-lg font-semibold">We couldn&apos;t load this connector</h2>
+        <p className="text-sm text-muted-foreground">
+          Something went wrong fetching this record. Refresh the page or head back
+          to connectors.
+        </p>
+        <Link
+          href="/platform/connectors"
+          className="inline-block text-sm font-medium text-primary hover:underline"
+        >
+          ← Back to connectors
+        </Link>
+      </div>
+    );
+  }
 
   return <ConnectorDetail connector={connector} />;
 }
