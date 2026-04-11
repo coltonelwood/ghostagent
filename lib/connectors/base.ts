@@ -297,6 +297,17 @@ export const CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [
         description: "Your Make team ID from Settings > Team",
       },
     ],
+    configFields: [
+      {
+        key: "zone",
+        label: "Zone",
+        type: "text",
+        required: false,
+        placeholder: "us1",
+        description:
+          "Make region — us1, us2, eu1, or eu2. Leave blank for us1.",
+      },
+    ],
   },
   {
     kind: "rippling",

@@ -309,8 +309,16 @@ export default function OnboardingPage() {
                   Connect your first source
                 </h2>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                  Pick a source to start discovering AI systems in your stack.
-                  You can add more later.
+                  Pick a quick option below to finish onboarding in one screen,
+                  or{" "}
+                  <Link
+                    href="/platform/connectors"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    browse all 10 sources
+                  </Link>{" "}
+                  — GitHub, GitLab, AWS, Azure, GCP, Zapier, n8n, Make,
+                  BambooHR, Rippling.
                 </p>
               </div>
 
