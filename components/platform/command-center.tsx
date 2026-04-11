@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -233,9 +234,19 @@ export function CommandCenterDashboard({
   if (!analytics || analytics.totalAssets === 0) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-          <p className="text-muted-foreground text-sm mt-1">Your AI asset landscape will appear here once you connect a source.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Your AI asset landscape will appear here once you connect a source.
+            </p>
+          </div>
+          <Link
+            href="/demo"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border rounded-lg px-3 py-2 transition-colors self-start sm:self-auto"
+          >
+            See a sample scan →
+          </Link>
         </div>
 
         {/* Onboarding steps */}
@@ -274,7 +285,7 @@ export function CommandCenterDashboard({
               }`}>Step {item.step}</div>
               <h3 className="font-semibold">{item.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-              <a
+              <Link
                 href={item.href}
                 className={`inline-block text-sm font-medium transition-colors ${
                   item.active
@@ -283,7 +294,7 @@ export function CommandCenterDashboard({
                 }`}
               >
                 {item.cta}
-              </a>
+              </Link>
             </div>
           ))}
         </div>
@@ -293,16 +304,19 @@ export function CommandCenterDashboard({
           <h3 className="text-sm font-semibold mb-4">Supported sources</h3>
           <div className="flex flex-wrap gap-3">
             {[
-              { name: "GitHub", icon: "🐙" },
-              { name: "GitLab", icon: "🦊" },
-              { name: "AWS", icon: "☁️" },
-              { name: "Zapier", icon: "⚡" },
-              { name: "n8n", icon: "🔄" },
-              { name: "BambooHR", icon: "🌿" },
-              { name: "Rippling", icon: "👥" },
+              { name: "GitHub", icon: "GH" },
+              { name: "GitLab", icon: "GL" },
+              { name: "AWS", icon: "AWS" },
+              { name: "Zapier", icon: "ZAP" },
+              { name: "n8n", icon: "n8n" },
+              { name: "BambooHR", icon: "BHR" },
+              { name: "Rippling", icon: "RP" },
             ].map((s) => (
-              <span key={s.name} className="flex items-center gap-1.5 text-sm text-muted-foreground border rounded-lg px-3 py-1.5">
-                {s.icon} {s.name}
+              <span key={s.name} className="flex items-center gap-2 text-sm text-muted-foreground border rounded-lg px-3 py-1.5">
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground/80 px-1">
+                  {s.icon}
+                </span>
+                {s.name}
               </span>
             ))}
           </div>
@@ -341,12 +355,12 @@ export function CommandCenterDashboard({
                 <p className="text-sm text-muted-foreground">
                   {analytics.criticalAssets} critical asset
                   {analytics.criticalAssets !== 1 ? "s" : ""} detected.{" "}
-                  <a
+                  <Link
                     href="/platform/assets?risk_level=critical"
                     className="text-primary underline underline-offset-4"
                   >
                     View all
-                  </a>
+                  </Link>
                 </p>
               )}
             </CardContent>
@@ -375,12 +389,12 @@ export function CommandCenterDashboard({
               </span>{" "}
               open violation{analytics.openViolations !== 1 ? "s" : ""}{" "}
               require attention.{" "}
-              <a
+              <Link
                 href="/platform/policies"
                 className="text-primary underline underline-offset-4"
               >
                 Review policies
-              </a>
+              </Link>
             </p>
           </CardContent>
         </Card>

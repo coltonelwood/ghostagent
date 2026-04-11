@@ -55,7 +55,7 @@ export default function LoginPage() {
             <>
               <h1 className="text-2xl font-bold text-white mt-6">Sign in to Nexus</h1>
               <p className="mt-2 text-sm text-white/40">
-                Enter your work email. We'll send you a secure sign-in link.
+                Enter your work email. We&apos;ll send you a secure sign-in link.
               </p>
             </>
           )}

@@ -26,8 +26,8 @@ export default function OnboardingPage() {
   // Step 2 state
   const [connectorKind, setConnectorKind] = useState<"github" | "zapier" | null>(null);
   const [connectorToken, setConnectorToken] = useState("");
+  const [githubOrg, setGithubOrg] = useState("");
   const [connectingSource, setConnectingSource] = useState(false);
-  const [sourceConnected, setSourceConnected] = useState(false);
   const [sourceError, setSourceError] = useState("");
 
   // Step 3 state
@@ -67,6 +67,33 @@ export default function OnboardingPage() {
 
   async function connectSource() {
     if (!connectorKind) return;
+
+    // Build credentials with the correct field names each connector expects
+    let credentials: Record<string, string>;
+    let config: Record<string, string> = {};
+    let name: string;
+
+    if (connectorKind === "github") {
+      if (!githubOrg.trim()) {
+        setSourceError("Enter your GitHub organization name");
+        return;
+      }
+      if (!connectorToken.trim()) {
+        setSourceError("Enter a GitHub personal access token");
+        return;
+      }
+      credentials = { token: connectorToken.trim(), org: githubOrg.trim() };
+      config = { org: githubOrg.trim() };
+      name = `GitHub — ${githubOrg.trim()}`;
+    } else {
+      if (!connectorToken.trim()) {
+        setSourceError("Enter a Zapier API key");
+        return;
+      }
+      credentials = { apiKey: connectorToken.trim() };
+      name = "Zapier";
+    }
+
     setConnectingSource(true);
     setSourceError("");
     try {
@@ -75,18 +102,17 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind: connectorKind,
-          name: connectorKind === "github" ? "GitHub" : "Zapier",
-          credentials: { token: connectorToken },
-          config: {},
+          name,
+          credentials,
+          config,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setSourceError(data.error ?? "Failed to connect source");
+        setSourceError(data.error ?? "We couldn't verify those credentials. Please check and try again.");
         setConnectingSource(false);
         return;
       }
-      setSourceConnected(true);
       setConnectingSource(false);
       setStep(2);
     } catch {
@@ -259,21 +285,46 @@ export default function OnboardingPage() {
                 </button>
               </div>
 
-              {connectorKind && (
+              {connectorKind === "github" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>GitHub Organization</Label>
+                    <Input
+                      value={githubOrg}
+                      onChange={(e) => setGithubOrg(e.target.value)}
+                      placeholder="my-company"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The org name as it appears in github.com/<span className="font-mono">my-company</span>.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Personal Access Token</Label>
+                    <Input
+                      type="password"
+                      value={connectorToken}
+                      onChange={(e) => setConnectorToken(e.target.value)}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Needs <span className="font-mono">repo</span> read scope. We encrypt it with AES-256-GCM before storage.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {connectorKind === "zapier" && (
                 <div className="space-y-1.5">
-                  <Label>
-                    {connectorKind === "github" ? "Personal Access Token" : "API Key"}
-                  </Label>
+                  <Label>API Key</Label>
                   <Input
                     type="password"
                     value={connectorToken}
                     onChange={(e) => setConnectorToken(e.target.value)}
-                    placeholder={
-                      connectorKind === "github"
-                        ? "ghp_xxxxxxxxxxxxxxxxxxxx"
-                        : "zap_xxxxxxxxxxxxxxxxxxxx"
-                    }
+                    placeholder="zap_xxxxxxxxxxxxxxxxxxxx"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Find it in Zapier Settings → Developer → API Key.
+                  </p>
                 </div>
               )}
 
@@ -292,10 +343,15 @@ export default function OnboardingPage() {
                 </div>
                 <Button
                   onClick={connectSource}
-                  disabled={!connectorKind || !connectorToken || connectingSource}
+                  disabled={
+                    !connectorKind ||
+                    !connectorToken ||
+                    (connectorKind === "github" && !githubOrg) ||
+                    connectingSource
+                  }
                 >
                   {connectingSource ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Connecting...</>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying...</>
                   ) : (
                     <>Connect <ArrowRight className="h-4 w-4 ml-1.5" /></>
                   )}

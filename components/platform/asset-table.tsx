@@ -86,6 +86,36 @@ function SkeletonRow() {
   );
 }
 
+// ---- Sortable header (declared at module scope so it is stable) ----
+
+function SortHeader({
+  label,
+  field,
+  activeField,
+  onToggle,
+}: {
+  label: string;
+  field: SortKey;
+  activeField: SortKey;
+  onToggle: (field: SortKey) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(field)}
+      className="inline-flex items-center gap-1 hover:text-foreground"
+    >
+      {label}
+      <ArrowUpDown
+        className={cn(
+          "size-3",
+          activeField === field ? "opacity-100" : "opacity-30",
+        )}
+      />
+    </button>
+  );
+}
+
 // ---- Component ----
 
 export function AssetTable({
@@ -176,28 +206,6 @@ export function AssetTable({
 
   // ---- Render ----
 
-  const SortHeader = ({
-    label,
-    field,
-  }: {
-    label: string;
-    field: SortKey;
-  }) => (
-    <button
-      type="button"
-      onClick={() => toggleSort(field)}
-      className="inline-flex items-center gap-1 hover:text-foreground"
-    >
-      {label}
-      <ArrowUpDown
-        className={cn(
-          "size-3",
-          sortKey === field ? "opacity-100" : "opacity-30"
-        )}
-      />
-    </button>
-  );
-
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {/* Bulk action bar */}
@@ -256,23 +264,23 @@ export function AssetTable({
               />
             </TableHead>
             <TableHead>
-              <SortHeader label="Name" field="name" />
+              <SortHeader label="Name" field="name" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead>
-              <SortHeader label="Source" field="source" />
+              <SortHeader label="Source" field="source" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead>
-              <SortHeader label="Kind" field="kind" />
+              <SortHeader label="Kind" field="kind" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead>Owner</TableHead>
             <TableHead>
-              <SortHeader label="Risk" field="risk_score" />
+              <SortHeader label="Risk" field="risk_score" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead>
-              <SortHeader label="Status" field="status" />
+              <SortHeader label="Status" field="status" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead>
-              <SortHeader label="Last Seen" field="last_seen_at" />
+              <SortHeader label="Last Seen" field="last_seen_at" activeField={sortKey} onToggle={toggleSort} />
             </TableHead>
             <TableHead className="w-10" />
           </TableRow>

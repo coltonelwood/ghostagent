@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 // ─── DATA ──────────────────────────────────────────────────────────────────
 
@@ -280,7 +279,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-6 py-28">
           <div className="mb-4 text-sm font-semibold uppercase tracking-widest text-violet-400">How it works</div>
           <h2 className="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">
-            Four steps to knowing what's running.
+            Four steps to knowing what&apos;s running.
           </h2>
           <p className="mt-5 text-lg text-white/50 max-w-2xl">
             Most teams go from zero visibility to a complete AI asset inventory in under an hour.
