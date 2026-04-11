@@ -1,288 +1,401 @@
 import Link from "next/link";
+import { ArrowRight, ArrowLeft, FileText } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { cn } from "@/lib/utils";
+import {
+  Database,
+  AlertTriangle,
+  UserX,
+  ShieldAlert,
+  Clock,
+} from "lucide-react";
 
-// ─── DEMO DATA ─────────────────────────────────────────────────────────────
-// Represents a realistic scan output from a healthcare tech company.
+// --------------------------------------------------------------------------
+// Fixture data — curated findings from a fictional healthcare SaaS
+// --------------------------------------------------------------------------
 
-const FINDINGS = [
+interface Finding {
+  id: string;
+  name: string;
+  path: string;
+  repo: string;
+  type: string;
+  risk: "critical" | "high" | "medium" | "low";
+  confidence: number;
+  owner: string | null;
+  ownerStatus: "active" | "inactive" | "orphaned";
+  lastActive: number | null;
+  frameworks: string[];
+  services: string[];
+  description: string;
+  finding: string;
+}
+
+const FINDINGS: Finding[] = [
   {
     id: "1",
     name: "claims-fraud-v3",
     path: ".env.example",
-    repo: "acme-corp/claims-engine",
+    repo: "acme/claims-engine",
     type: "ML Scoring Service",
-    risk: "critical" as const,
-    owner: null,
-    owner_github: null,
-    last_active: 247,
-    services: ["postgres", "openai"],
+    risk: "critical",
     confidence: 94,
+    owner: null,
+    ownerStatus: "orphaned",
+    lastActive: 247,
     frameworks: ["HIPAA", "SOC 2"],
-    description: "Production ML model scoring every claim submission for fraud. Confidence threshold: 0.85.",
-    finding: "No documented owner or model card. If this model drifts or produces biased outputs, claims are being approved or rejected with no human review and no accountability.",
+    services: ["postgres", "openai"],
+    description:
+      "Production ML model scoring every claim submission for fraud. Confidence threshold 0.85.",
+    finding:
+      "No documented owner or model card. If this model drifts or produces biased outputs, claims are being approved or rejected with no human review and no accountability.",
   },
   {
     id: "2",
-    name: "nlu-triage",
+    name: "nlu-triage-bert",
     path: "ml/nlu-triage/requirements.txt",
-    repo: "acme-corp/ml-services",
+    repo: "acme/ml-services",
     type: "Clinical NLP Model",
-    risk: "critical" as const,
-    owner: "achen@acme.com",
-    owner_github: "achen",
-    last_active: 203,
-    services: ["postgres"],
+    risk: "critical",
     confidence: 96,
+    owner: "achen@acme.com",
+    ownerStatus: "inactive",
+    lastActive: 203,
     frameworks: ["HIPAA", "EU AI Act"],
-    description: "Fine-tuned Bio_ClinicalBERT model classifying urgency of patient messages. Runs as a FastAPI service.",
-    finding: "Owner (@achen) has not committed in 203 days and may have left the company. A patient triage model with no active owner is a governance and patient safety risk.",
+    services: ["postgres"],
+    description:
+      "Fine-tuned Bio_ClinicalBERT model classifying urgency of patient messages. Runs as a FastAPI service.",
+    finding:
+      "Owner @achen has not committed in 203 days and may have left the company. A patient triage model with no active owner is a governance and patient safety risk.",
   },
   {
     id: "3",
-    name: "prototype-chat/chat-server.ts",
+    name: "prototype-chat",
     path: "experiments/prototype-chat/chat-server.ts",
-    repo: "acme-corp/platform",
-    type: "Prototype — No Auth",
-    risk: "critical" as const,
-    owner: "ajiang@acme.com",
-    owner_github: "ajiang",
-    last_active: 189,
-    services: [],
+    repo: "acme/platform",
+    type: "Prototype · no auth",
+    risk: "critical",
     confidence: 97,
+    owner: "ajiang@acme.com",
+    ownerStatus: "inactive",
+    lastActive: 189,
     frameworks: ["HIPAA"],
-    description: "Patient-provider WebSocket chat prototype. No authentication. In-memory only. No audit logging.",
-    finding: "If this prototype ever processed real patient data in this state, it may create significant HIPAA exposure. Original author inactive for 189 days.",
+    services: [],
+    description:
+      "Patient-provider WebSocket chat prototype. No authentication. In-memory only. No audit logging.",
+    finding:
+      "If this prototype ever processed real patient data in this state, it may create significant HIPAA exposure. Original author inactive for 189 days.",
   },
   {
     id: "4",
     name: "ai-coding-suggestions",
     path: "experiments/feature-flags/flag-config.json",
-    repo: "acme-corp/platform",
-    type: "Active AI Feature — 20% Rollout",
-    risk: "high" as const,
-    owner: "schen@acme.com",
-    owner_github: "schen",
-    last_active: 91,
-    services: [],
+    repo: "acme/platform",
+    type: "Active AI feature · 20% rollout",
+    risk: "high",
     confidence: 88,
+    owner: "schen@acme.com",
+    ownerStatus: "active",
+    lastActive: 91,
     frameworks: ["HIPAA", "SOC 2"],
-    description: "AI-powered ICD-10 and CPT billing code suggestions. Active at 20% rollout. Fine-tuned model.",
-    finding: "No documented accuracy baseline. No human review step before codes are used. Inaccurate suggestions could create billing compliance risk.",
+    services: [],
+    description:
+      "AI-powered ICD-10 and CPT billing code suggestions. Active at 20% rollout. Fine-tuned model.",
+    finding:
+      "No documented accuracy baseline. No human review step before codes are used. Inaccurate suggestions could create billing compliance risk.",
   },
   {
     id: "5",
     name: "run-anomaly-detection.ts",
     path: "cron/weekly/run-anomaly-detection.ts",
-    repo: "acme-corp/claims-engine",
-    type: "ML Cron Agent",
-    risk: "high" as const,
-    owner: "jliu@acme.com",
-    owner_github: "jliu",
-    last_active: 74,
-    services: ["postgres", "slack", "sendgrid"],
+    repo: "acme/claims-engine",
+    type: "ML cron agent",
+    risk: "high",
     confidence: 91,
+    owner: "jliu@acme.com",
+    ownerStatus: "active",
+    lastActive: 74,
     frameworks: ["SOC 2"],
-    description: "Weekly ML-based anomaly detection on all claims. Checks upcoding, duplicate billing, unusual volumes.",
-    finding: "Owner is documented only in a code comment. If James Liu has left, there is no accountable owner for a system that makes compliance decisions every Sunday.",
+    services: ["postgres", "slack", "sendgrid"],
+    description:
+      "Weekly ML-based anomaly detection on all claims. Checks upcoding, duplicate billing, unusual volumes.",
+    finding:
+      "Owner is documented only in a code comment. If James Liu has left, there is no accountable owner for a system that makes compliance decisions every Sunday.",
   },
 ];
 
-const RISK_CONFIG = {
-  critical: { label: "Critical", dot: "bg-red-500", text: "text-red-400", border: "border-red-500/20 bg-red-500/[0.06]", badge: "bg-red-500/15 text-red-400 border-red-500/20" },
-  high:     { label: "High",     dot: "bg-orange-400", text: "text-orange-400", border: "border-orange-500/20 bg-orange-500/[0.04]", badge: "bg-orange-500/15 text-orange-400 border-orange-500/20" },
-  medium:   { label: "Medium",   dot: "bg-yellow-400", text: "text-yellow-400", border: "border-yellow-500/20 bg-yellow-500/[0.04]", badge: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" },
-  low:      { label: "Low",      dot: "bg-emerald-400", text: "text-emerald-400", border: "border-white/[0.06] bg-white/[0.02]", badge: "bg-white/[0.06] text-white/50 border-white/10" },
+const FRAMEWORK_CLASS: Record<string, string> = {
+  HIPAA: "border-destructive/20 bg-destructive/10 text-destructive",
+  "SOC 2": "border-info/20 bg-info/10 text-info",
+  "EU AI Act": "border-primary/20 bg-primary/10 text-primary",
+  "ISO 42001": "border-primary/20 bg-primary/10 text-primary",
 };
 
-const FRAMEWORK_COLORS: Record<string, string> = {
-  "HIPAA":       "bg-red-500/10 text-red-400 border-red-500/20",
-  "SOC 2":       "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  "EU AI Act":   "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  "ISO 42001":   "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-};
-
-const SERVICE_COLORS: Record<string, string> = {
-  postgres:   "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  openai:     "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  slack:      "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  sendgrid:   "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-};
-
-// ─── PAGE ──────────────────────────────────────────────────────────────────
+// --------------------------------------------------------------------------
 
 export default function DemoPage() {
   const critical = FINDINGS.filter((f) => f.risk === "critical").length;
-  const unowned = FINDINGS.filter((f) => !f.owner).length;
-  const stale = FINDINGS.filter((f) => f.last_active > 90).length;
+  const unowned = FINDINGS.filter(
+    (f) => !f.owner || f.ownerStatus === "orphaned",
+  ).length;
+  const inactive = FINDINGS.filter((f) => f.ownerStatus === "inactive").length;
   const hipaa = FINDINGS.filter((f) => f.frameworks.includes("HIPAA")).length;
 
   return (
-    <div className="min-h-screen bg-[#07070c] text-white">
-
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#07070c]/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-600">
-              <span className="text-xs font-bold text-white">N</span>
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              Back
+            </Link>
+            <div className="mx-2 h-5 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <div className="flex size-6 items-center justify-center rounded bg-primary">
+                <span className="text-[10px] font-semibold text-primary-foreground">
+                  N
+                </span>
+              </div>
+              <span className="text-sm font-semibold">Nexus</span>
+              <span className="ml-1 inline-flex h-5 items-center rounded-sm border border-border bg-muted/40 px-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+                Sample scan
+              </span>
             </div>
-            <span className="text-sm font-semibold">Nexus</span>
-            <span className="hidden sm:block text-xs text-white/25 border border-white/[0.08] rounded-full px-2 py-0.5">
-              Sample scan — acme-corp
-            </span>
           </div>
           <Link
             href="/auth/login"
-            className="text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-lg px-4 py-2 transition-colors"
+            className={buttonVariants({ size: "sm" })}
           >
-            Scan your org →
+            Scan your org
+            <ArrowRight className="size-3.5" />
           </Link>
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-6 py-8 space-y-6">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <PageHeader
+          title="AI asset inventory — acme-corp"
+          description="18 repositories scanned. 5 AI systems discovered across code and ML services. This is a sample — sign in to run Nexus on your own organization."
+          meta={
+            <>
+              <span className="nx-tabular">4m 12s</span>
+              <span>·</span>
+              <span>6 connectors</span>
+              <span>·</span>
+              <span>Scan completed 2 minutes ago</span>
+            </>
+          }
+          secondaryActions={
+            <button
+              type="button"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <FileText className="size-3.5" />
+              Export PDF
+            </button>
+          }
+        />
 
-        {/* Scan summary */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <h1 className="text-lg font-semibold">AI Asset Inventory — acme-corp</h1>
-            <span className="text-xs text-white/30">Scanned 18 repos · 4 min 12 sec</span>
-          </div>
-          <p className="text-sm text-white/40">GitHub · AWS · Zapier · n8n · BambooHR</p>
+        {/* KPIs */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Assets found"
+            value={FINDINGS.length}
+            icon={Database}
+            description="Across 18 repositories"
+          />
+          <StatCard
+            label="Critical"
+            value={critical}
+            icon={AlertTriangle}
+            tone="danger"
+            description="Require immediate review"
+          />
+          <StatCard
+            label="Orphaned or inactive"
+            value={unowned + inactive}
+            icon={UserX}
+            tone="warning"
+            description="Owner departed or dormant"
+          />
+          <StatCard
+            label="HIPAA exposure"
+            value={hipaa}
+            icon={ShieldAlert}
+            tone="danger"
+            description="Potential PHI touchpoints"
+          />
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Assets found",    value: FINDINGS.length, color: "text-white" },
-            { label: "Critical risk",   value: critical,         color: "text-red-400" },
-            { label: "HIPAA exposure",  value: hipaa,            color: "text-red-400" },
-            { label: "Inactive owners", value: stale,            color: "text-orange-400" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
-              <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-xs text-white/35 mt-1">{s.label}</div>
+        {/* Banner */}
+        <div className="mt-6 rounded-lg border border-destructive/20 bg-destructive/5 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <div className="text-[13px] leading-relaxed">
+              <span className="font-semibold text-destructive">
+                {critical} critical findings
+              </span>
+              <span className="text-foreground">
+                {" "}
+                — {unowned} with no owner on record, {hipaa} involving data
+                covered by HIPAA. Recommended for review before your next audit.
+              </span>
             </div>
-          ))}
+          </div>
         </div>
 
-        {/* Alert banner */}
-        <div className="rounded-xl border border-red-500/25 bg-red-500/[0.06] px-5 py-3.5">
-          <p className="text-sm text-red-300 leading-relaxed">
-            <span className="font-semibold">{critical} critical findings</span> — {unowned > 0 ? `${unowned} asset${unowned > 1 ? "s" : ""} with no owner on record,` : ""} {hipaa} findings involve data covered by HIPAA. Review recommended before next audit.
-          </p>
-        </div>
+        {/* Findings list */}
+        <section className="mt-8 space-y-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Findings
+          </h2>
 
-        {/* Findings */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-medium text-white/50 uppercase tracking-wider">Findings</h2>
-          {FINDINGS.map((f) => {
-            const rc = RISK_CONFIG[f.risk];
-            return (
-              <div key={f.id} className={`rounded-2xl border p-5 space-y-4 ${rc.border}`}>
-
-                {/* Header row */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold border rounded-full px-2.5 py-1 ${rc.badge}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${rc.dot}`} />
-                        {rc.label}
-                      </span>
-                      <span className="text-xs text-white/30 border border-white/[0.07] rounded-full px-2.5 py-1">
-                        {f.type}
-                      </span>
-                    </div>
-                    <h3 className="text-base font-semibold text-white">{f.name}</h3>
-                    <p className="text-xs font-mono text-white/30 truncate">{f.repo} · {f.path}</p>
+          {FINDINGS.map((f) => (
+            <article
+              key={f.id}
+              className="nx-surface p-5 transition-colors hover:border-border-strong"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RiskBadge level={f.risk} size="sm" />
+                    <span className="inline-flex h-5 items-center rounded-sm border border-border px-1.5 text-[11px] text-muted-foreground">
+                      {f.type}
+                    </span>
                   </div>
-
-                  {/* Confidence */}
-                  <div className="text-right shrink-0">
-                    <div className="text-xs text-white/25">Detection confidence</div>
-                    <div className="text-lg font-bold text-white/60">{f.confidence}%</div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="text-sm text-white/45">{f.description}</p>
-
-                {/* Finding */}
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-                  <p className="text-sm text-white/70 leading-relaxed">
-                    <span className="font-medium text-white/90">Finding: </span>
-                    {f.finding}
+                  <h3 className="text-[15px] font-semibold tracking-tight">
+                    {f.name}
+                  </h3>
+                  <p className="nx-mono truncate text-[11px] text-muted-foreground/80">
+                    {f.repo} · {f.path}
                   </p>
                 </div>
 
-                {/* Meta row */}
-                <div className="flex flex-wrap items-center gap-4 text-xs text-white/35">
-                  {/* Owner */}
-                  {f.owner ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className={`h-1.5 w-1.5 rounded-full ${f.last_active > 90 ? "bg-orange-400" : "bg-emerald-400"}`} />
-                      <span>{f.owner}</span>
-                      <span className={f.last_active > 90 ? "text-orange-400" : ""}>
-                        · {f.last_active}d since last commit
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                      <span className="text-red-400">No owner on record</span>
-                    </div>
-                  )}
+                <div className="text-right text-[11px]">
+                  <p className="text-muted-foreground">Confidence</p>
+                  <p className="text-base font-semibold nx-tabular">
+                    {f.confidence}%
+                  </p>
+                </div>
+              </div>
 
-                  {/* Frameworks */}
-                  <div className="flex gap-1.5 flex-wrap">
+              <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
+                {f.description}
+              </p>
+
+              <div className="mt-3 rounded-md border border-border bg-muted/30 px-4 py-3">
+                <p className="text-[13px] leading-relaxed text-foreground">
+                  <span className="font-semibold">Finding: </span>
+                  {f.finding}
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-[11px]">
+                {f.owner ? (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <span
+                      className={cn(
+                        "inline-block size-1.5 rounded-full",
+                        f.ownerStatus === "active"
+                          ? "bg-success"
+                          : "bg-warning",
+                      )}
+                    />
+                    <span className="text-foreground">{f.owner}</span>
+                    {f.lastActive !== null && (
+                      <>
+                        <span>·</span>
+                        <span
+                          className={cn(
+                            "nx-tabular",
+                            f.lastActive > 90
+                              ? "text-warning"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {f.lastActive}d since last commit
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-destructive">
+                    <span className="inline-block size-1.5 rounded-full bg-destructive" />
+                    <span>No owner on record</span>
+                  </div>
+                )}
+
+                {f.frameworks.length > 0 && (
+                  <div className="flex items-center gap-1.5">
                     {f.frameworks.map((fw) => (
-                      <span key={fw} className={`px-2 py-0.5 rounded-full border text-[11px] font-medium ${FRAMEWORK_COLORS[fw] ?? "bg-white/5 text-white/40 border-white/10"}`}>
+                      <span
+                        key={fw}
+                        className={cn(
+                          "inline-flex h-5 items-center rounded-sm border px-1.5 text-[10px] font-medium",
+                          FRAMEWORK_CLASS[fw] ??
+                            "border-border bg-muted text-muted-foreground",
+                        )}
+                      >
                         {fw}
                       </span>
                     ))}
                   </div>
+                )}
 
-                  {/* Services */}
-                  {f.services.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap">
-                      {f.services.map((svc) => (
-                        <span key={svc} className={`px-2 py-0.5 rounded-full border text-[11px] ${SERVICE_COLORS[svc] ?? "bg-white/5 text-white/40 border-white/10"}`}>
-                          {svc}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {f.services.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    {f.services.map((s) => (
+                      <span
+                        key={s}
+                        className="inline-flex h-5 items-center rounded-sm bg-muted px-1.5 text-[10px] nx-mono"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </article>
+          ))}
+        </section>
 
-        {/* CTA */}
-        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-8 text-center space-y-4">
-          <h2 className="text-xl font-semibold text-white">
+        {/* Footer CTA */}
+        <div className="mt-10 rounded-lg border border-border bg-card p-8 text-center">
+          <Clock className="mx-auto mb-3 size-5 text-muted-foreground/70" />
+          <h2 className="text-lg font-semibold tracking-tight">
             These findings are from a fictional company.
           </h2>
-          <p className="text-white/45 text-sm max-w-lg mx-auto leading-relaxed">
-            Connect your GitHub org and we&apos;ll run the same scan on your real repositories.
-            Takes under 5 minutes. No agent to install.
+          <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">
+            Connect your own sources and Nexus will run the same scan on your
+            real code, cloud, and automations. First scan takes under five
+            minutes. No agent to install.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/auth/login"
-              className="h-11 px-8 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-sm transition-colors inline-flex items-center"
+              className={buttonVariants({ size: "lg" })}
             >
-              Start free scan →
+              Start free scan
+              <ArrowRight className="size-4" />
             </Link>
             <Link
               href="/"
-              className="text-sm text-white/40 hover:text-white/70 transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Learn more about Nexus
             </Link>
           </div>
-          <p className="text-xs text-white/20">No credit card. No install. Results in under 5 minutes.</p>
+          <p className="mt-4 text-[11px] text-muted-foreground/70">
+            No credit card required. Credentials encrypted with AES-256-GCM.
+          </p>
         </div>
-
       </div>
     </div>
   );

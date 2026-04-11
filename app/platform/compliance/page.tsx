@@ -2,85 +2,51 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, XCircle, AlertCircle, HelpCircle, Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import {
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  HelpCircle,
+  Download,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
-import { LinkButton } from "@/components/ui/link-button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
+
+// --------------------------------------------------------------------------
+// Framework definitions
+// --------------------------------------------------------------------------
 
 const FRAMEWORKS = [
   {
     code: "eu_ai_act",
     name: "EU AI Act",
     description: "European Union AI regulation effective August 2026",
-    abbr: "EU", color: "bg-violet-900/40 text-violet-300",
+    abbr: "EU",
   },
   {
     code: "soc2_ai",
     name: "SOC 2 AI Controls",
     description: "SOC 2 controls relevant to AI systems",
-    abbr: "S2", color: "bg-blue-900/40 text-blue-300",
+    abbr: "S2",
   },
   {
     code: "iso42001",
     name: "ISO/IEC 42001",
     description: "International AI management system standard",
-    abbr: "ISO", color: "bg-indigo-900/40 text-indigo-300",
+    abbr: "ISO",
   },
   {
     code: "nist_ai_rmf",
     name: "NIST AI RMF",
     description: "NIST AI Risk Management Framework",
-    abbr: "RMF", color: "bg-slate-900/40 text-slate-300",
+    abbr: "RMF",
   },
 ];
-
-function ComplianceGauge({ score, label }: { score: number; label: string }) {
-  const color =
-    score >= 80
-      ? "text-emerald-500"
-      : score >= 50
-        ? "text-yellow-500"
-        : score > 0
-          ? "text-destructive"
-          : "text-muted-foreground";
-  const bgColor =
-    score >= 80
-      ? "bg-emerald-500"
-      : score >= 50
-        ? "bg-yellow-500"
-        : score > 0
-          ? "bg-destructive"
-          : "bg-muted-foreground/20";
-
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{label}</span>
-        <span className={color}>{score > 0 ? `${score}%` : "No data"}</span>
-      </div>
-      <div className="h-2 bg-muted rounded-full">
-        <div
-          className={`h-2 rounded-full transition-all ${bgColor}`}
-          style={{ width: score > 0 ? `${score}%` : "100%" }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case "compliant":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
-    case "non_compliant":
-      return <XCircle className="h-4 w-4 text-destructive" />;
-    case "needs_review":
-      return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-    default:
-      return <HelpCircle className="h-4 w-4 text-muted-foreground" />;
-  }
-}
 
 interface FrameworkData {
   code: string;
@@ -104,6 +70,41 @@ interface ComplianceData {
   top_gaps: GapData[];
 }
 
+// --------------------------------------------------------------------------
+// Components
+// --------------------------------------------------------------------------
+
+function ScoreColor(score: number): string {
+  if (score >= 80) return "text-success";
+  if (score >= 50) return "text-warning";
+  if (score > 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
+function ScoreBarColor(score: number): string {
+  if (score >= 80) return "bg-success";
+  if (score >= 50) return "bg-warning";
+  if (score > 0) return "bg-destructive";
+  return "bg-muted-foreground/30";
+}
+
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "compliant":
+      return <CheckCircle2 className="size-3.5 text-success" />;
+    case "non_compliant":
+      return <XCircle className="size-3.5 text-destructive" />;
+    case "needs_review":
+      return <AlertCircle className="size-3.5 text-warning" />;
+    default:
+      return <HelpCircle className="size-3.5 text-muted-foreground" />;
+  }
+}
+
+// --------------------------------------------------------------------------
+// Page
+// --------------------------------------------------------------------------
+
 export default function CompliancePage() {
   const [data, setData] = useState<ComplianceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,20 +114,29 @@ export default function CompliancePage() {
       .then((r) => r.json())
       .then((d) => {
         const raw = d.data;
-        if (!raw) { setData({ overall_score: 0, frameworks: [], top_gaps: [] }); return; }
-        // Normalize API shape (overallScore) to page shape (overall_score)
-        // Also derive compliant_controls / non_compliant_controls / total_controls from controls array
+        if (!raw) {
+          setData({ overall_score: 0, frameworks: [], top_gaps: [] });
+          return;
+        }
         const normalized = {
           overall_score: raw.overallScore ?? raw.overall_score ?? 0,
-          frameworks: (raw.frameworks ?? []).map((fw: { code: string; name: string; score: number; controls?: Array<{status: string; required: boolean}>; gaps?: unknown[] }) => ({
-            code: fw.code,
-            name: fw.name,
-            score: fw.score ?? 0,
-            total_controls: fw.controls?.length ?? 0,
-            compliant_controls: fw.controls?.filter((c) => c.status === "compliant").length ?? 0,
-            non_compliant_controls: fw.controls?.filter((c) => c.status === "non_compliant").length ?? 0,
-          })),
-          top_gaps: [],
+          frameworks: (raw.frameworks ?? []).map(
+            (fw: {
+              code: string;
+              score?: number;
+              controls?: Array<{ status: string; required: boolean }>;
+            }) => ({
+              code: fw.code,
+              score: fw.score ?? 0,
+              total_controls: fw.controls?.length ?? 0,
+              compliant_controls:
+                fw.controls?.filter((c) => c.status === "compliant").length ?? 0,
+              non_compliant_controls:
+                fw.controls?.filter((c) => c.status === "non_compliant")
+                  .length ?? 0,
+            }),
+          ),
+          top_gaps: raw.top_gaps ?? [],
         };
         setData(normalized);
       })
@@ -155,12 +165,15 @@ export default function CompliancePage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-        <div className="h-32 bg-muted animate-pulse rounded-xl" />
-        <div className="grid sm:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-48 bg-muted animate-pulse rounded-xl" />
+      <div className="space-y-6">
+        <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+        <div className="h-24 animate-pulse rounded-lg border border-border bg-muted/30" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-36 animate-pulse rounded-lg border border-border bg-muted/30"
+            />
           ))}
         </div>
       </div>
@@ -168,164 +181,213 @@ export default function CompliancePage() {
   }
 
   const overallScore = data?.overall_score ?? 0;
-  const overallColor =
-    overallScore >= 80
-      ? "text-emerald-500"
-      : overallScore >= 50
-        ? "text-yellow-500"
-        : overallScore > 0
-          ? "text-destructive"
-          : "text-muted-foreground";
+  const hasData = overallScore > 0 || (data?.frameworks.length ?? 0) > 0;
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Compliance</h1>
-          <p className="text-muted-foreground mt-1">
-            Review your AI asset inventory against common compliance framework controls
+    <div className="space-y-6">
+      <PageHeader
+        title="Compliance"
+        description="Map your AI asset inventory to the frameworks your auditors care about. Nexus provides evidence — it does not certify compliance."
+        secondaryActions={
+          <Button variant="outline" size="sm" onClick={downloadReport}>
+            <Download className="size-3.5" />
+            Download report
+          </Button>
+        }
+      />
+
+      {/* Overall score */}
+      <div className="nx-surface flex items-center gap-6 p-6">
+        <div className="min-w-[90px] text-center">
+          <p
+            className={cn(
+              "text-5xl font-semibold nx-tabular",
+              ScoreColor(overallScore),
+            )}
+          >
+            {overallScore > 0 ? overallScore : "—"}
+          </p>
+          <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Overall score
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={downloadReport}>
-            <Download className="h-4 w-4 mr-1.5" />
-            Download Report
-          </Button>
+        <div className="flex-1 border-l border-border pl-6">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
+            {overallScore === 0
+              ? "Connect data sources and assess your AI assets to generate a compliance posture score."
+              : overallScore >= 80
+                ? "Your organization has strong AI governance coverage. Keep monitoring for drift."
+                : overallScore >= 50
+                  ? "Your compliance posture needs improvement. Review the framework gaps below."
+                  : "Significant compliance gaps detected. Immediate attention recommended."}
+          </p>
         </div>
       </div>
 
-      {/* Overall posture score */}
-      <Card>
-        <CardContent className="pt-6 pb-6">
-          <div className="flex items-center gap-6">
-            <div className="text-center min-w-[80px]">
-              <p className={`text-5xl font-bold ${overallColor}`}>
-                {overallScore > 0 ? overallScore : "--"}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">Overall Score</p>
-            </div>
-            <div className="flex-1 border-l pl-6">
-              <p className="text-sm text-muted-foreground">
-                {overallScore === 0
-                  ? "Connect data sources and assess your AI assets to generate a compliance posture score."
-                  : overallScore >= 80
-                    ? "Your organization has strong AI governance compliance. Keep monitoring for changes."
-                    : overallScore >= 50
-                      ? "Your compliance posture needs improvement. Review the gaps below."
-                      : "Significant compliance gaps detected. Immediate attention required."}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Framework cards with ComplianceGauge */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        {FRAMEWORKS.map((fw) => {
-          const fwData = data?.frameworks.find((f) => f.code === fw.code);
-          const score = fwData?.score ?? 0;
-
-          return (
-            <Card key={fw.code} className="hover:border-primary/50 transition-colors">
-              <CardHeader className="pb-3">
+      {/* Framework cards */}
+      {hasData ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {FRAMEWORKS.map((fw) => {
+            const fwData = data?.frameworks.find((f) => f.code === fw.code);
+            const score = fwData?.score ?? 0;
+            return (
+              <div
+                key={fw.code}
+                className="nx-surface space-y-4 p-5 transition-colors hover:border-border-strong"
+              >
                 <div className="flex items-start gap-3">
-                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${(fw as unknown as {color: string}).color}`}>{(fw as unknown as {abbr: string}).abbr}</div>
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 text-[11px] font-semibold text-muted-foreground">
+                    {fw.abbr}
+                  </div>
                   <div>
-                    <CardTitle className="text-base">{fw.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-0.5">{fw.description}</p>
+                    <h3 className="text-[14px] font-semibold tracking-tight">
+                      {fw.name}
+                    </h3>
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      {fw.description}
+                    </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <ComplianceGauge score={score} label="Coverage" />
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Coverage</span>
+                    <span className={cn("font-medium", ScoreColor(score))}>
+                      {score > 0 ? `${score}%` : "No data"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn("h-full", ScoreBarColor(score))}
+                      style={{ width: score > 0 ? `${score}%` : "100%" }}
+                    />
+                  </div>
+                </div>
 
                 {fwData && fwData.total_controls > 0 && (
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <CheckCircle2 className="size-3 text-success" />
                       {fwData.compliant_controls} compliant
                     </span>
                     <span className="flex items-center gap-1">
-                      <XCircle className="h-3 w-3 text-destructive" />
+                      <XCircle className="size-3 text-destructive" />
                       {fwData.non_compliant_controls} gaps
                     </span>
-                    <span>{fwData.total_controls} total</span>
+                    <span className="ml-auto nx-tabular">
+                      {fwData.total_controls} controls
+                    </span>
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <LinkButton
-                    href={`/platform/compliance/${fw.code}`}
-                    size="sm"
-                    className="flex-1"
-                  >
-                    View Details
-                  </LinkButton>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Top gaps table */}
-      {data && data.top_gaps.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Top Compliance Gaps</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y">
-              {data.top_gaps.map((gap, i) => (
-                <div
-                  key={`${gap.framework}-${gap.control_id}-${i}`}
-                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                <Link
+                  href={`/platform/compliance/${fw.code}`}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "w-full",
+                  )}
                 >
-                  <StatusIcon status={gap.status} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-muted-foreground">
-                        {gap.control_id}
-                      </span>
-                      <span className="text-sm font-medium">{gap.control_name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {gap.framework} - {gap.asset_count} asset
-                      {gap.asset_count !== 1 ? "s" : ""} affected
-                    </p>
-                  </div>
-                  <Badge
-                    variant={gap.status === "non_compliant" ? "destructive" : "outline"}
-                    className="capitalize text-xs"
-                  >
-                    {gap.status.replace("_", " ")}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  View details
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="nx-surface">
+          <EmptyState
+            title="No compliance data yet"
+            description="Run your first scan to populate framework mappings and generate an overall coverage score."
+            primaryAction={
+              <Link
+                href="/platform/connectors"
+                className={buttonVariants({ size: "sm" })}
+              >
+                Add connector
+              </Link>
+            }
+          />
+        </div>
       )}
 
-      {/* EU AI Act urgency callout */}
-      <Card className="border-orange-500/30 bg-orange-500/5">
-        <CardContent className="pt-5">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">⏰</span>
-            <div>
-              <h3 className="font-semibold">EU AI Act — August 2026 Deadline</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-                The EU AI Act establishes requirements for documented risk management, transparency, and human
-                oversight for high-risk AI systems. Enforcement for non-compliant systems
-                may include fines up to 30M EUR or 6% of global annual turnover.
-              </p>
-              <LinkButton href="/platform/compliance/eu_ai_act" size="sm" className="mt-3">
-                Check EU AI Act Readiness
-              </LinkButton>
-            </div>
+      {/* Top gaps */}
+      {data && data.top_gaps.length > 0 && (
+        <div className="nx-surface">
+          <div className="border-b border-border px-5 py-3">
+            <h3 className="text-[13px] font-semibold tracking-tight">
+              Top compliance gaps
+            </h3>
           </div>
-        </CardContent>
-      </Card>
+          <ul className="divide-y divide-border">
+            {data.top_gaps.map((gap, i) => (
+              <li
+                key={`${gap.framework}-${gap.control_id}-${i}`}
+                className="flex items-center gap-3 px-5 py-3"
+              >
+                <StatusIcon status={gap.status} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="nx-mono text-[11px] font-semibold text-muted-foreground">
+                      {gap.control_id}
+                    </span>
+                    <span className="text-[13px] font-medium">
+                      {gap.control_name}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {gap.framework} · {gap.asset_count} asset
+                    {gap.asset_count !== 1 ? "s" : ""} affected
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex h-5 items-center rounded-sm border px-1.5 text-[11px] capitalize",
+                    gap.status === "non_compliant"
+                      ? "border-destructive/20 bg-destructive/10 text-destructive"
+                      : "border-border text-muted-foreground",
+                  )}
+                >
+                  {gap.status.replace("_", " ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* EU AI Act callout */}
+      <div className="rounded-lg border border-warning/30 bg-warning/5 p-5">
+        <div className="flex items-start gap-3">
+          <Clock className="mt-0.5 size-4 shrink-0 text-warning" />
+          <div>
+            <h3 className="text-[14px] font-semibold">
+              EU AI Act — August 2026 deadline
+            </h3>
+            <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
+              The EU AI Act establishes requirements for documented risk
+              management, transparency, and human oversight for high-risk AI
+              systems. Enforcement may include fines up to €30M or 6% of global
+              annual turnover.
+            </p>
+            <Link
+              href="/platform/compliance/eu_ai_act"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "mt-4",
+              )}
+            >
+              Check EU AI Act readiness
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground/70">
+        Nexus provides structured evidence to support your compliance efforts.
+        It is not a substitute for a qualified auditor or legal counsel.
+      </p>
     </div>
   );
 }

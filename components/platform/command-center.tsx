@@ -1,16 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Database,
   AlertTriangle,
   UserX,
   ShieldAlert,
-  Activity,
   Plug,
+  ArrowRight,
+  CheckCircle2,
+  Activity,
+  Clock,
 } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
+import { riskVariant } from "@/lib/design/risk";
+import { eventSeverityMeta } from "@/lib/design/status";
 
 interface AnalyticsData {
   totalAssets: number;
@@ -33,198 +42,379 @@ interface AnalyticsData {
   complianceScore: number | null;
 }
 
-const RISK_COLORS: Record<string, string> = {
-  critical: "bg-red-500",
-  high: "bg-orange-500",
-  medium: "bg-yellow-500",
-  low: "bg-green-500",
-};
+// --------------------------------------------------------------------------
+// Empty state — the first-run dashboard a prospect sees
+// --------------------------------------------------------------------------
 
-const SEVERITY_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
-  critical: "destructive",
-  high: "destructive",
-  medium: "secondary",
-  low: "outline",
-};
-
-function StatsGrid({ analytics }: { analytics: AnalyticsData }) {
-  const stats = [
+function EmptyDashboard() {
+  const steps = [
     {
-      label: "Total Assets",
-      value: analytics.totalAssets,
-      icon: Database,
-      description: "Active AI assets",
+      step: "01",
+      title: "Connect a source",
+      description:
+        "Link GitHub, GitLab, AWS, or an automation platform. Credentials are encrypted with AES-256-GCM before storage.",
+      cta: "Add connector",
+      href: "/platform/connectors",
+      active: true,
     },
     {
-      label: "Critical / High Risk",
-      value: `${analytics.criticalAssets} / ${analytics.assetsByRiskLevel.high ?? 0}`,
-      icon: AlertTriangle,
-      description: "Require attention",
+      step: "02",
+      title: "Run your first sync",
+      description:
+        "Nexus scans connected sources and surfaces every AI asset it finds — models, LLM integrations, feature flags, automations.",
+      cta: "Review sources",
+      href: "/platform/connectors",
+      active: false,
     },
     {
-      label: "Orphaned Assets",
-      value: analytics.orphanedAssets,
-      icon: UserX,
-      description: "No active owner",
-    },
-    {
-      label: "Open Violations",
-      value: analytics.openViolations,
-      icon: ShieldAlert,
-      description: "Policy violations",
+      step: "03",
+      title: "Review the registry",
+      description:
+        "Each asset gets a risk score, owner, and compliance mapping. Set policies to enforce governance automatically.",
+      cta: "Open registry",
+      href: "/platform/assets",
+      active: false,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {stats.map((stat) => {
-        const Icon = stat.icon;
-        return (
-          <Card key={stat.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                {stat.label}
+    <div className="space-y-6">
+      <PageHeader
+        title="Overview"
+        description="Your AI asset landscape will appear here once you connect a source."
+        secondaryActions={
+          <Link
+            href="/demo"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            See a sample scan
+            <ArrowRight className="size-3.5" />
+          </Link>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {steps.map((item) => (
+          <div
+            key={item.step}
+            className={cn(
+              "nx-surface flex flex-col gap-3 p-5",
+              item.active && "ring-1 ring-primary/30",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className={cn(
+                  "nx-mono text-[11px] font-semibold",
+                  item.active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                Step {item.step}
               </span>
-              <Icon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">
-                {stat.description}
-              </p>
-            </CardContent>
-          </Card>
-        );
-      })}
+              {item.active && (
+                <span className="inline-flex items-center gap-1 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+                  Start here
+                </span>
+              )}
+            </div>
+            <h3 className="text-base font-semibold tracking-tight">
+              {item.title}
+            </h3>
+            <p className="flex-1 text-[13px] leading-relaxed text-muted-foreground">
+              {item.description}
+            </p>
+            <Link
+              href={item.href}
+              className={cn(
+                "inline-flex items-center gap-1 text-xs font-medium",
+                item.active
+                  ? "text-primary hover:underline"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {item.cta} <ArrowRight className="size-3" />
+            </Link>
+          </div>
+        ))}
+      </div>
+
+      <div className="nx-surface p-5">
+        <h3 className="text-[13px] font-semibold tracking-tight">
+          Supported sources
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ten integrations across code, cloud, automation, and HR.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            "GitHub",
+            "GitLab",
+            "AWS",
+            "Azure",
+            "GCP",
+            "Zapier",
+            "n8n",
+            "Make",
+            "BambooHR",
+            "Rippling",
+          ].map((name) => (
+            <span
+              key={name}
+              className="inline-flex h-7 items-center rounded-sm border border-border px-2 text-xs text-muted-foreground"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-function RiskDistribution({ assetsByRiskLevel }: { assetsByRiskLevel: Record<string, number> }) {
-  const total = Object.values(assetsByRiskLevel).reduce((s, v) => s + v, 0);
+// --------------------------------------------------------------------------
+// Risk distribution chart — horizontal stacked bar + legend
+// --------------------------------------------------------------------------
+
+function RiskDistribution({ byLevel }: { byLevel: Record<string, number> }) {
   const levels = ["critical", "high", "medium", "low"] as const;
+  const total = levels.reduce((sum, l) => sum + (byLevel[l] ?? 0), 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Risk Distribution</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {levels.map((level) => {
-          const count = assetsByRiskLevel[level] ?? 0;
-          const pct = total > 0 ? (count / total) * 100 : 0;
-          return (
-            <div key={level} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="capitalize">{level}</span>
-                <span className="font-medium">
-                  {count} ({pct.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+    <div className="nx-surface p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold tracking-tight">
+          Risk distribution
+        </h3>
+        <span className="text-xs text-muted-foreground nx-tabular">
+          {total} total
+        </span>
+      </div>
+
+      {total === 0 ? (
+        <div className="py-8 text-center text-xs text-muted-foreground">
+          No assets scored yet.
+        </div>
+      ) : (
+        <>
+          <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-muted">
+            {levels.map((level) => {
+              const count = byLevel[level] ?? 0;
+              const pct = total > 0 ? (count / total) * 100 : 0;
+              if (pct === 0) return null;
+              const variant = riskVariant(level);
+              return (
                 <div
-                  className={`h-full rounded-full transition-all ${RISK_COLORS[level]}`}
+                  key={level}
+                  className={cn("h-full", variant.dotClass)}
                   style={{ width: `${pct}%` }}
+                  title={`${variant.label}: ${count}`}
                 />
-              </div>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+            {levels.map((level) => {
+              const count = byLevel[level] ?? 0;
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              const variant = riskVariant(level);
+              return (
+                <div key={level} className="flex items-center gap-2">
+                  <span
+                    className={cn("size-2 rounded-full", variant.dotClass)}
+                    aria-hidden
+                  />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {variant.label}
+                    </span>
+                    <span className="text-sm font-semibold nx-tabular">
+                      {count}{" "}
+                      <span className="text-[11px] font-normal text-muted-foreground">
+                        ({pct}%)
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
-function EventFeed({
-  events,
-}: {
-  events: AnalyticsData["recentEvents"];
-}) {
-  if (events.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Events</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No events yet. Events will appear here as connectors sync and
-            policies are evaluated.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+// --------------------------------------------------------------------------
+// Source distribution — horizontal bars
+// --------------------------------------------------------------------------
+
+function SourceDistribution({ bySource }: { bySource: Record<string, number> }) {
+  const entries = Object.entries(bySource).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = entries[0]?.[1] ?? 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Events</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {events.map((event) => (
-            <div
-              key={event.id}
-              className="flex items-start gap-3 rounded-lg border p-3"
-            >
-              <Activity className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{event.title}</span>
-                  <Badge
-                    variant={SEVERITY_VARIANT[event.severity] ?? "outline"}
-                  >
-                    {event.severity}
-                  </Badge>
+    <div className="nx-surface p-5">
+      <h3 className="text-[13px] font-semibold tracking-tight">Assets by source</h3>
+      {entries.length === 0 ? (
+        <div className="py-8 text-center text-xs text-muted-foreground">
+          No sources yet.
+        </div>
+      ) : (
+        <div className="mt-5 space-y-3">
+          {entries.map(([source, count]) => {
+            const pct = max > 0 ? (count / max) * 100 : 0;
+            return (
+              <div key={source} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="capitalize text-foreground">{source}</span>
+                  <span className="nx-tabular text-muted-foreground">{count}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(event.created_at).toLocaleString()}
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary/80"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Recent events feed
+// --------------------------------------------------------------------------
+
+function RecentEvents({ events }: { events: AnalyticsData["recentEvents"] }) {
+  return (
+    <div className="nx-surface flex flex-col">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <h3 className="text-[13px] font-semibold tracking-tight">Recent events</h3>
+        <Link
+          href="/platform/events"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          View all →
+        </Link>
+      </div>
+      {events.length === 0 ? (
+        <div className="px-5 py-10 text-center">
+          <Activity className="mx-auto mb-2 size-5 text-muted-foreground/50" />
+          <p className="text-xs text-muted-foreground">
+            Events will appear here as connectors sync and policies run.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {events.slice(0, 6).map((event) => {
+            const meta = eventSeverityMeta(event.severity);
+            return (
+              <li key={event.id} className="flex items-start gap-3 px-5 py-3">
+                <span
+                  className={cn("mt-1.5 size-1.5 rounded-full shrink-0", meta.dotClass)}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-foreground">
+                    {event.title}
+                  </p>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className={cn("capitalize", meta.textClass)}>
+                      {meta.label}
+                    </span>
+                    <span>·</span>
+                    <span className="nx-tabular">
+                      {formatRelative(event.created_at)}
+                    </span>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Connector health strip
+// --------------------------------------------------------------------------
+
+function ConnectorHealth({
+  byStatus,
+  total,
+}: {
+  byStatus: Record<string, number>;
+  total: number;
+}) {
+  const entries = Object.entries(byStatus);
+
+  return (
+    <div className="nx-surface p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold tracking-tight">
+          Connector health
+        </h3>
+        <Link
+          href="/platform/connectors"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Manage →
+        </Link>
+      </div>
+      {total === 0 ? (
+        <EmptyState
+          variant="inline"
+          icon={Plug}
+          title="No connectors yet"
+          description="Add your first connector to start discovering AI assets."
+          primaryAction={
+            <Link
+              href="/platform/connectors"
+              className={buttonVariants({ size: "sm" })}
+            >
+              Add connector
+            </Link>
+          }
+        />
+      ) : (
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {entries.map(([status, count]) => (
+            <div
+              key={status}
+              className="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-3"
+            >
+              <CheckCircle2
+                className={cn(
+                  "size-4",
+                  status === "active" && "text-success",
+                  status === "error" && "text-destructive",
+                  status === "paused" && "text-warning",
+                )}
+              />
+              <div>
+                <p className="text-[11px] font-medium capitalize text-muted-foreground">
+                  {status}
                 </p>
+                <p className="text-sm font-semibold nx-tabular">{count}</p>
               </div>
             </div>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
-function ConnectorHealth({
-  connectorsByStatus,
-  connectorCount,
-}: {
-  connectorsByStatus: Record<string, number>;
-  connectorCount: number;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connector Health</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {connectorCount === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No connectors configured yet. Add your first connector to start
-            discovering AI assets.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(connectorsByStatus).map(([status, count]) => (
-              <div key={status} className="flex items-center gap-2 rounded-lg border p-3">
-                <Plug className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium capitalize">{status}</p>
-                  <p className="text-lg font-bold">{count}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+// --------------------------------------------------------------------------
+// Main dashboard
+// --------------------------------------------------------------------------
 
 export function CommandCenterDashboard({
   analytics,
@@ -232,194 +422,153 @@ export function CommandCenterDashboard({
   analytics: AnalyticsData | null;
 }) {
   if (!analytics || analytics.totalAssets === 0) {
-    return (
-      <div className="space-y-8">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              Your AI asset landscape will appear here once you connect a source.
-            </p>
-          </div>
-          <Link
-            href="/demo"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border rounded-lg px-3 py-2 transition-colors self-start sm:self-auto"
-          >
-            See a sample scan →
-          </Link>
-        </div>
-
-        {/* Onboarding steps */}
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            {
-              step: "1",
-              title: "Connect a source",
-              desc: "Link GitHub, AWS, GitLab, or an automation platform. Credentials are encrypted end-to-end.",
-              href: "/platform/connectors",
-              cta: "Add connector →",
-              active: true,
-            },
-            {
-              step: "2",
-              title: "Run your first sync",
-              desc: "Nexus will scan your connected sources and surface every AI asset it finds.",
-              href: "/platform/connectors",
-              cta: "Connect first →",
-              active: false,
-            },
-            {
-              step: "3",
-              title: "Review your inventory",
-              desc: "Every asset gets a risk score, owner, and compliance tag. Set policies to enforce governance automatically.",
-              href: "/platform/assets",
-              cta: "View registry →",
-              active: false,
-            },
-          ].map((item) => (
-            <div key={item.step} className={`rounded-xl border p-6 space-y-3 ${
-              item.active ? "border-violet-200 bg-violet-50/30" : "bg-muted/20"
-            }`}>
-              <div className={`text-xs font-bold uppercase tracking-wider ${
-                item.active ? "text-violet-600" : "text-muted-foreground"
-              }`}>Step {item.step}</div>
-              <h3 className="font-semibold">{item.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-              <Link
-                href={item.href}
-                className={`inline-block text-sm font-medium transition-colors ${
-                  item.active
-                    ? "text-violet-600 hover:text-violet-700"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {item.cta}
-              </Link>
-            </div>
-          ))}
-        </div>
-
-        {/* Supported sources */}
-        <div className="rounded-xl border bg-card p-6">
-          <h3 className="text-sm font-semibold mb-4">Supported sources</h3>
-          <div className="flex flex-wrap gap-3">
-            {[
-              { name: "GitHub", icon: "GH" },
-              { name: "GitLab", icon: "GL" },
-              { name: "AWS", icon: "AWS" },
-              { name: "Zapier", icon: "ZAP" },
-              { name: "n8n", icon: "n8n" },
-              { name: "BambooHR", icon: "BHR" },
-              { name: "Rippling", icon: "RP" },
-            ].map((s) => (
-              <span key={s.name} className="flex items-center gap-2 text-sm text-muted-foreground border rounded-lg px-3 py-1.5">
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground/80 px-1">
-                  {s.icon}
-                </span>
-                {s.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <EmptyDashboard />;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          AI asset risk posture across your connected sources.
-        </p>
-      </div>
-
-      <StatsGrid analytics={analytics} />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <RiskDistribution
-            assetsByRiskLevel={analytics.assetsByRiskLevel}
-          />
-          {/* Top critical assets placeholder — rendered from same analytics data */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Critical Assets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {analytics.criticalAssets === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No critical assets. Great job!
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {analytics.criticalAssets} critical asset
-                  {analytics.criticalAssets !== 1 ? "s" : ""} detected.{" "}
-                  <Link
-                    href="/platform/assets?risk_level=critical"
-                    className="text-primary underline underline-offset-4"
-                  >
-                    View all
-                  </Link>
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <EventFeed events={analytics.recentEvents} />
-          <ConnectorHealth
-            connectorsByStatus={analytics.connectorsByStatus}
-            connectorCount={analytics.connectorCount}
-          />
-        </div>
-      </div>
-
-      {/* Policy violations summary */}
-      {analytics.openViolations > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Policy Violations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">
-              <span className="font-bold text-destructive">
-                {analytics.openViolations}
-              </span>{" "}
-              open violation{analytics.openViolations !== 1 ? "s" : ""}{" "}
-              require attention.{" "}
-              <Link
-                href="/platform/policies"
-                className="text-primary underline underline-offset-4"
+      <PageHeader
+        title="Overview"
+        description="AI asset risk posture across your connected sources."
+        primaryAction={
+          <Link
+            href="/platform/reports"
+            className={buttonVariants({ size: "sm" })}
+          >
+            Export report
+            <ArrowRight className="size-3.5" />
+          </Link>
+        }
+        secondaryActions={
+          <div className="hidden items-center gap-1 rounded-md border border-border p-0.5 text-xs sm:flex">
+            {["7d", "30d", "90d"].map((range, i) => (
+              <button
+                key={range}
+                className={cn(
+                  "h-6 rounded-sm px-2 font-medium transition-colors",
+                  i === 1
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
-                Review policies
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+                {range}
+              </button>
+            ))}
+          </div>
+        }
+      />
+
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total assets"
+          value={analytics.totalAssets}
+          icon={Database}
+          description="Active AI systems"
+          href="/platform/assets"
+        />
+        <StatCard
+          label="Critical risk"
+          value={analytics.criticalAssets}
+          icon={AlertTriangle}
+          tone={analytics.criticalAssets > 0 ? "danger" : "neutral"}
+          description={
+            analytics.criticalAssets > 0 ? "Require attention" : "Clean"
+          }
+          href="/platform/assets?risk=critical"
+        />
+        <StatCard
+          label="Orphaned"
+          value={analytics.orphanedAssets}
+          icon={UserX}
+          tone={analytics.orphanedAssets > 0 ? "warning" : "neutral"}
+          description={
+            analytics.orphanedAssets > 0
+              ? "No active owner"
+              : "Every asset has an owner"
+          }
+          href="/platform/assets?owner=orphaned"
+        />
+        <StatCard
+          label="Open violations"
+          value={analytics.openViolations}
+          icon={ShieldAlert}
+          tone={analytics.openViolations > 0 ? "warning" : "neutral"}
+          description={
+            analytics.openViolations > 0 ? "Policy breaches" : "All clear"
+          }
+          href="/platform/policies"
+        />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RiskDistribution byLevel={analytics.assetsByRiskLevel} />
+        <SourceDistribution bySource={analytics.assetsBySource} />
+      </div>
+
+      {/* Events + connectors */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RecentEvents events={analytics.recentEvents} />
+        <ConnectorHealth
+          byStatus={analytics.connectorsByStatus}
+          total={analytics.connectorCount}
+        />
+      </div>
+
+      {/* Compliance footer */}
+      {analytics.complianceScore !== null && (
+        <div className="nx-surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 items-center justify-center rounded-md bg-primary/10">
+              <ClockIcon />
+            </div>
+            <div>
+              <h3 className="text-[13px] font-semibold tracking-tight">
+                Compliance coverage
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {analytics.complianceScore}% of mapped controls have evidence.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/platform/compliance"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Review frameworks
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
       )}
 
-      {analytics.complianceScore !== null && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Compliance Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <span className="text-3xl font-bold">
-                {analytics.complianceScore}%
-              </span>
-              <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${analytics.complianceScore}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Safety / disclaimer strip */}
+      <p className="text-[11px] text-muted-foreground/70">
+        Nexus surfaces evidence to support governance and compliance work. It
+        does not certify compliance or replace a qualified auditor.
+      </p>
     </div>
   );
+}
+
+// --------------------------------------------------------------------------
+
+function ClockIcon() {
+  return <Clock className="size-5 text-primary" />;
+}
+
+function formatRelative(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = now - then;
+  if (diff < 0) return "just now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }

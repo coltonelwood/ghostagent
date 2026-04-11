@@ -1,13 +1,21 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "sonner";
 import Link from "next/link";
-import { LinkButton } from "@/components/ui/link-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  Download,
+  Plug,
+  MoreHorizontal,
+} from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RiskBadge } from "@/components/ui/risk-badge";
+import { FilterBar, FacetDropdown } from "@/components/platform/filter-bar";
 import {
   Table,
   TableBody,
@@ -16,20 +24,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import {
-  Search,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  Database,
-  ChevronDown,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ownerStatusMeta } from "@/lib/design/status";
+
+// --------------------------------------------------------------------------
+// Types
+// --------------------------------------------------------------------------
 
 interface Asset {
   id: string;
@@ -47,74 +47,136 @@ interface Asset {
   created_at: string;
 }
 
-const RISK_COLORS: Record<string, string> = {
-  critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  low: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-};
+const SOURCE_OPTIONS = [
+  { value: "github", label: "GitHub" },
+  { value: "gitlab", label: "GitLab" },
+  { value: "aws", label: "AWS" },
+  { value: "gcp", label: "Google Cloud" },
+  { value: "azure", label: "Azure" },
+  { value: "zapier", label: "Zapier" },
+  { value: "n8n", label: "n8n" },
+  { value: "make", label: "Make" },
+  { value: "sdk", label: "SDK" },
+];
 
-const OWNER_STATUS_LABELS: Record<string, string> = {
-  active_owner: "Active",
-  inactive_owner: "Inactive",
-  unknown_owner: "Unknown",
-  orphaned: "Orphaned",
-  reassignment_pending: "Reassigning",
-  reviewed_unassigned: "Unassigned",
-};
+const RISK_OPTIONS = [
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
 
-function AssetRiskBadge({ level }: { level: string }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${RISK_COLORS[level] ?? ""}`}
-    >
-      {level}
-    </span>
-  );
-}
+const OWNER_OPTIONS = [
+  { value: "active_owner", label: "Active" },
+  { value: "inactive_owner", label: "Inactive" },
+  { value: "unknown_owner", label: "Unknown" },
+  { value: "orphaned", label: "Orphaned" },
+];
 
-function OwnerBadge({ status }: { status: string }) {
-  const isOrphaned = status === "orphaned";
-  return (
-    <Badge variant={isOrphaned ? "destructive" : "outline"}>
-      {OWNER_STATUS_LABELS[status] ?? status}
-    </Badge>
-  );
-}
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "quarantined", label: "Quarantined" },
+  { value: "archived", label: "Archived" },
+];
 
-function FilterDropdown({
-  label,
-  value,
-  options,
-  onChange,
+const SAVED_VIEWS = [
+  { id: "all", label: "All assets" },
+  { id: "critical", label: "Critical & high" },
+  { id: "orphaned", label: "Orphaned" },
+  { id: "production", label: "Production" },
+];
+
+// --------------------------------------------------------------------------
+// Owner badge
+// --------------------------------------------------------------------------
+
+function OwnerCell({
+  email,
+  status,
 }: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
+  email: string | null;
+  status: string;
 }) {
+  const meta = ownerStatusMeta(status);
+  const displayName = email ? email.split("@")[0] : "Unassigned";
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="outline" size="sm" className="gap-1">
-            {label}
-            {value && `: ${options.find((o) => o.value === value)?.label ?? value}`}
-            <ChevronDown className="size-3" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={() => onChange("")}>All</DropdownMenuItem>
-        {options.map((opt) => (
-          <DropdownMenuItem key={opt.value} onClick={() => onChange(opt.value)}>
-            {opt.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex items-center gap-2 min-w-0">
+      <span className={cn("inline-block size-1.5 rounded-full shrink-0", meta.dotClass)} />
+      <div className="min-w-0">
+        <p className="truncate text-[13px] text-foreground">
+          {email ? displayName : <span className="text-muted-foreground">—</span>}
+        </p>
+        <p className="truncate text-[11px] text-muted-foreground">{meta.label}</p>
+      </div>
+    </div>
   );
 }
+
+// --------------------------------------------------------------------------
+// Bulk action bar
+// --------------------------------------------------------------------------
+
+function BulkActionBar({
+  count,
+  onAction,
+  onClear,
+}: {
+  count: number;
+  onAction: (action: string) => void;
+  onClear: () => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="sticky bottom-4 z-10 mx-auto flex items-center gap-2 rounded-md border border-border bg-popover px-3 py-2 shadow-md w-fit">
+      <span className="text-xs font-medium">
+        <span className="nx-tabular">{count}</span> selected
+      </span>
+      <div className="h-4 w-px bg-border" />
+      <Button variant="ghost" size="xs" onClick={() => onAction("reassign")}>
+        Reassign
+      </Button>
+      <Button variant="ghost" size="xs" onClick={() => onAction("tag")}>
+        Tag
+      </Button>
+      <Button variant="ghost" size="xs" onClick={() => onAction("review")}>
+        Mark reviewed
+      </Button>
+      <Button variant="ghost" size="xs" onClick={() => onAction("archive")}>
+        Archive
+      </Button>
+      <div className="h-4 w-px bg-border" />
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-xs text-muted-foreground hover:text-foreground"
+      >
+        Clear
+      </button>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Skeleton row
+// --------------------------------------------------------------------------
+
+function SkeletonRow() {
+  return (
+    <TableRow>
+      {Array.from({ length: 7 }).map((_, i) => (
+        <TableCell key={i} className="py-3">
+          <div className="h-3.5 w-full max-w-[120px] animate-pulse rounded bg-muted" />
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Main page
+// --------------------------------------------------------------------------
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -123,19 +185,32 @@ export default function AssetsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
-  const [source, setSource] = useState("");
-  const [riskLevel, setRiskLevel] = useState("");
-  const [ownerStatus, setOwnerStatus] = useState("");
-  const [status, setStatus] = useState("");
+  const [sources, setSources] = useState<string[]>([]);
+  const [risk, setRisk] = useState<string[]>([]);
+  const [owner, setOwner] = useState<string[]>([]);
+  const [status, setStatus] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function applyView(id: string) {
+    setActiveView(id);
+    setRisk([]);
+    setOwner([]);
+    setStatus([]);
+    setPage(1);
+    if (id === "critical") setRisk(["critical", "high"]);
+    else if (id === "orphaned") setOwner(["orphaned"]);
+    else if (id === "production") setStatus(["active"]);
+  }
 
   const fetchAssets = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: "20" });
     if (search) params.set("search", search);
-    if (source) params.set("source", source);
-    if (riskLevel) params.set("risk_level", riskLevel);
-    if (ownerStatus) params.set("owner_status", ownerStatus);
-    if (status) params.set("status", status);
+    if (sources.length) params.set("source", sources.join(","));
+    if (risk.length) params.set("risk_level", risk.join(","));
+    if (owner.length) params.set("owner_status", owner.join(","));
+    if (status.length) params.set("status", status.join(","));
 
     try {
       const res = await fetch(`/api/assets?${params}`);
@@ -150,188 +225,310 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, source, riskLevel, ownerStatus, status]);
+  }, [page, search, sources, risk, owner, status]);
 
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [search, source, riskLevel, ownerStatus, status]);
+  }, [search, sources, risk, owner, status]);
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === assets.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(assets.map((a) => a.id)));
+    }
+  }
+
+  const allSelected = assets.length > 0 && selected.size === assets.length;
+  const hasFilters =
+    search.length > 0 ||
+    sources.length > 0 ||
+    risk.length > 0 ||
+    owner.length > 0 ||
+    status.length > 0;
+
+  function clearAllFilters() {
+    setSearch("");
+    setSources([]);
+    setRisk([]);
+    setOwner([]);
+    setStatus([]);
+    setActiveView("all");
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Asset Registry</h1>
-        <p className="text-muted-foreground">
-          Discover and manage all AI assets across your organization.
-        </p>
-      </div>
+      <PageHeader
+        title="Asset registry"
+        description="Every AI system Nexus has discovered across your connected sources."
+        meta={
+          total > 0 && (
+            <>
+              <span className="nx-tabular">{total}</span>
+              <span>{total === 1 ? "asset" : "assets"}</span>
+              <span>·</span>
+              <span>Last synced {new Date().toLocaleTimeString()}</span>
+            </>
+          )
+        }
+        primaryAction={
+          <Link
+            href="/platform/connectors"
+            className={buttonVariants({ size: "sm" })}
+          >
+            <Plug className="size-3.5" />
+            Add connector
+          </Link>
+        }
+        secondaryActions={
+          <Button variant="outline" size="sm">
+            <Download className="size-3.5" />
+            Export CSV
+          </Button>
+        }
+      />
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search assets..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        <FilterDropdown
-          label="Source"
-          value={source}
-          options={[
-            { value: "github", label: "GitHub" },
-            { value: "gitlab", label: "GitLab" },
-            { value: "aws", label: "AWS" },
-            { value: "gcp", label: "GCP" },
-            { value: "azure", label: "Azure" },
-            { value: "zapier", label: "Zapier" },
-            { value: "n8n", label: "n8n" },
-            { value: "make", label: "Make" },
-            { value: "sdk", label: "SDK" },
-          ]}
-          onChange={setSource}
-        />
-        <FilterDropdown
-          label="Risk"
-          value={riskLevel}
-          options={[
-            { value: "critical", label: "Critical" },
-            { value: "high", label: "High" },
-            { value: "medium", label: "Medium" },
-            { value: "low", label: "Low" },
-          ]}
-          onChange={setRiskLevel}
-        />
-        <FilterDropdown
-          label="Owner"
-          value={ownerStatus}
-          options={[
-            { value: "active_owner", label: "Active" },
-            { value: "orphaned", label: "Orphaned" },
-            { value: "unknown_owner", label: "Unknown" },
-          ]}
-          onChange={setOwnerStatus}
-        />
-        <FilterDropdown
-          label="Status"
-          value={status}
-          options={[
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-            { value: "quarantined", label: "Quarantined" },
-            { value: "archived", label: "Archived" },
-          ]}
-          onChange={setStatus}
-        />
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        savedViews={SAVED_VIEWS}
+        activeView={activeView}
+        onViewChange={applyView}
+        facets={
+          <>
+            <FacetDropdown
+              label="Source"
+              options={SOURCE_OPTIONS}
+              selected={sources}
+              onChange={setSources}
+            />
+            <FacetDropdown
+              label="Risk"
+              options={RISK_OPTIONS}
+              selected={risk}
+              onChange={setRisk}
+            />
+            <FacetDropdown
+              label="Owner"
+              options={OWNER_OPTIONS}
+              selected={owner}
+              onChange={setOwner}
+            />
+            <FacetDropdown
+              label="Status"
+              options={STATUS_OPTIONS}
+              selected={status}
+              onChange={setStatus}
+            />
+          </>
+        }
+      />
 
-      {/* Asset table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-pulse text-sm text-muted-foreground">
-                Loading assets...
-              </div>
-            </div>
-          ) : assets.length === 0 ? (
-            <div className="py-16 text-center">
-              <Database className="mx-auto size-10 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No assets yet</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                No assets yet. Connect your first data source to start
-                discovering AI assets.
-              </p>
-              <LinkButton href="/platform/connectors" className="mt-4">Add Connector</LinkButton>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Risk</TableHead>
-                  <TableHead className="hidden md:table-cell">Owner</TableHead>
-                  <TableHead className="hidden md:table-cell">Status</TableHead>
-                  <TableHead className="hidden lg:table-cell">Last Seen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assets.map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell>
+      <div className="nx-surface overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableHead className="w-10 pl-4">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  className="size-3.5 rounded border-border"
+                  aria-label="Select all"
+                />
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Name
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Source
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Owner
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Risk
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Environment
+              </TableHead>
+              <TableHead className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Last seen
+              </TableHead>
+              <TableHead className="w-8" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
+            ) : assets.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={8} className="py-0">
+                  {hasFilters ? (
+                    <EmptyState
+                      variant="inline"
+                      icon={Database}
+                      title="No assets match your filters"
+                      description="Try clearing filters or adjusting your search."
+                      primaryAction={
+                        <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                          Clear filters
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      variant="inline"
+                      icon={Database}
+                      title="No assets yet"
+                      description="Connect your first source to start discovering AI systems."
+                      primaryAction={
+                        <Link
+                          href="/platform/connectors"
+                          className={buttonVariants({ size: "sm" })}
+                        >
+                          Add connector
+                        </Link>
+                      }
+                    />
+                  )}
+                </TableCell>
+              </TableRow>
+            ) : (
+              assets.map((asset) => {
+                const isSelected = selected.has(asset.id);
+                return (
+                  <TableRow
+                    key={asset.id}
+                    data-state={isSelected ? "selected" : undefined}
+                    className="h-12 hover:bg-muted/40"
+                  >
+                    <TableCell className="pl-4">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleRow(asset.id)}
+                        className="size-3.5 rounded border-border"
+                        aria-label={`Select ${asset.name}`}
+                      />
+                    </TableCell>
+                    <TableCell className="max-w-[280px]">
                       <Link
                         href={`/platform/assets/${asset.id}`}
-                        className="font-medium text-primary hover:underline"
+                        className="block min-w-0"
                       >
-                        {asset.name}
-                      </Link>
-                      {asset.description && (
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground max-w-[200px]">
-                          {asset.description}
+                        <p className="truncate text-[13px] font-medium text-foreground">
+                          {asset.name}
                         </p>
-                      )}
+                        {asset.description && (
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {asset.description}
+                          </p>
+                        )}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{asset.source}</Badge>
+                      <span className="inline-flex h-5 items-center rounded-sm border border-border px-1.5 text-[11px] capitalize text-muted-foreground">
+                        {asset.source}
+                      </span>
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      <OwnerCell email={asset.owner_email} status={asset.owner_status} />
                     </TableCell>
                     <TableCell>
-                      <AssetRiskBadge level={asset.risk_level} />
+                      <RiskBadge
+                        level={asset.risk_level}
+                        score={asset.risk_score}
+                        size="sm"
+                      />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <OwnerBadge status={asset.owner_status} />
+                    <TableCell className="text-[12px] capitalize text-muted-foreground">
+                      {asset.environment}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline" className="capitalize">
-                        {asset.status}
-                      </Badge>
+                    <TableCell className="text-[12px] text-muted-foreground nx-tabular">
+                      {formatRelative(asset.last_seen_at)}
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                      {new Date(asset.last_seen_at).toLocaleDateString()}
+                    <TableCell className="pr-3">
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Row actions"
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of{" "}
-            {total} assets
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft className="size-4" />
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!hasMore}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight className="size-4" />
-            </Button>
+        {total > 0 && !loading && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+            <p className="nx-tabular">
+              Showing {(page - 1) * 20 + 1}–{Math.min(page * 20, total)} of {total}
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft className="size-3" />
+                Previous
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={!hasMore}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+                <ChevronRight className="size-3" />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      <BulkActionBar
+        count={selected.size}
+        onAction={(action) => toast.success(`${action} triggered for ${selected.size} assets`)}
+        onClear={() => setSelected(new Set())}
+      />
     </div>
   );
+}
+
+// --------------------------------------------------------------------------
+
+function formatRelative(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = now - then;
+  if (diff < 0) return "just now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }

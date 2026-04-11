@@ -2,17 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Plug, Users, ArrowRight, ArrowLeft, Loader2, SkipForward } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import {
+  ArrowRight,
+  ArrowLeft,
+  Loader2,
+  Check,
+  Plug,
+  Code,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
-  { label: "Organization", icon: Building2 },
-  { label: "Connect Source", icon: Plug },
-  { label: "Invite Team", icon: Users },
+  { n: 1, label: "Organization" },
+  { n: 2, label: "Connect source" },
+  { n: 3, label: "Invite team" },
 ];
 
 export default function OnboardingPage() {
@@ -23,14 +30,14 @@ export default function OnboardingPage() {
   const [orgCreated, setOrgCreated] = useState(false);
   const [orgError, setOrgError] = useState("");
 
-  // Step 2 state
-  const [connectorKind, setConnectorKind] = useState<"github" | "zapier" | null>(null);
+  const [connectorKind, setConnectorKind] = useState<"github" | "zapier" | null>(
+    null,
+  );
   const [connectorToken, setConnectorToken] = useState("");
   const [githubOrg, setGithubOrg] = useState("");
   const [connectingSource, setConnectingSource] = useState(false);
   const [sourceError, setSourceError] = useState("");
 
-  // Step 3 state
   const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
   const [inviteRole, setInviteRole] = useState("viewer");
   const [inviting, setInviting] = useState(false);
@@ -68,7 +75,6 @@ export default function OnboardingPage() {
   async function connectSource() {
     if (!connectorKind) return;
 
-    // Build credentials with the correct field names each connector expects
     let credentials: Record<string, string>;
     let config: Record<string, string> = {};
     let name: string;
@@ -100,16 +106,14 @@ export default function OnboardingPage() {
       const res = await fetch("/api/connectors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: connectorKind,
-          name,
-          credentials,
-          config,
-        }),
+        body: JSON.stringify({ kind: connectorKind, name, credentials, config }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setSourceError(data.error ?? "We couldn't verify those credentials. Please check and try again.");
+        setSourceError(
+          data.error ??
+            "We couldn't verify those credentials. Please check and try again.",
+        );
         setConnectingSource(false);
         return;
       }
@@ -151,19 +155,17 @@ export default function OnboardingPage() {
     }
   }
 
-  function addEmailField() {
-    setInviteEmails([...inviteEmails, ""]);
-  }
-
   function updateEmail(i: number, value: string) {
-    const next = [...inviteEmails];
-    next[i] = value;
-    setInviteEmails(next);
+    setInviteEmails((prev) => {
+      const next = [...prev];
+      next[i] = value;
+      return next;
+    });
   }
 
   function removeEmail(i: number) {
     if (inviteEmails.length <= 1) return;
-    setInviteEmails(inviteEmails.filter((_, idx) => idx !== i));
+    setInviteEmails((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function skipToDashboard() {
@@ -171,55 +173,98 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-lg space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center mx-auto mb-4">
-            <span className="text-primary-foreground font-bold text-sm">N</span>
-          </div>
-          <h1 className="text-2xl font-bold">Let&apos;s get you set up</h1>
-          <p className="text-muted-foreground mt-1">Takes about 3 minutes. You can add more sources any time.</p>
-        </div>
-
-        {/* Progress dots */}
-        <div className="flex items-center justify-center gap-3">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (i === 0 || (i === 1 && orgCreated) || (i === 2 && orgCreated)) {
-                    setStep(i);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-                  step === i
-                    ? "bg-primary text-primary-foreground"
-                    : step > i
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground"
-                )}
-              >
-                <s.icon className="h-3.5 w-3.5" />
-                {s.label}
-              </button>
-              {i < STEPS.length - 1 && (
-                <div className={cn("w-6 h-0.5", step > i ? "bg-primary" : "bg-muted")} />
-              )}
+    <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <header className="border-b border-border">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex size-6 items-center justify-center rounded bg-primary">
+              <span className="text-[10px] font-semibold text-primary-foreground">
+                N
+              </span>
             </div>
-          ))}
+            <span className="text-sm font-semibold">Nexus</span>
+          </Link>
+          <button
+            type="button"
+            onClick={skipToDashboard}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Skip for now →
+          </button>
         </div>
+      </header>
 
-        {/* Step 1: Organization */}
-        {step === 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Name your organization</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      <main className="mx-auto max-w-xl px-6 py-12">
+        <div className="space-y-8">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Let&apos;s get you set up
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Takes about three minutes. You can add more sources any time.
+            </p>
+          </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center gap-2">
+            {STEPS.map((s, i) => {
+              const complete = i < step;
+              const active = i === step;
+              return (
+                <div key={s.n} className="flex flex-1 items-center gap-2">
+                  <div
+                    className={cn(
+                      "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+                      complete &&
+                        "bg-success text-success-foreground",
+                      active && "bg-primary text-primary-foreground",
+                      !complete && !active && "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {complete ? <Check className="size-3" /> : s.n}
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[12px] font-medium",
+                      active
+                        ? "text-foreground"
+                        : complete
+                          ? "text-muted-foreground"
+                          : "text-muted-foreground/60",
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                  {i < STEPS.length - 1 && (
+                    <div
+                      className={cn(
+                        "h-px flex-1",
+                        complete ? "bg-success/60" : "bg-border",
+                      )}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Step 1: Organization */}
+          {step === 0 && (
+            <div className="nx-surface space-y-5 p-6">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  Name your organization
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  This is the workspace your team will join.
+                </p>
+              </div>
+
               <div className="space-y-1.5">
-                <Label>Organization Name <span className="text-destructive">*</span></Label>
+                <label className="text-[12px] font-medium">
+                  Organization name
+                </label>
                 <Input
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
@@ -227,121 +272,166 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === "Enter" && createOrg()}
                 />
               </div>
-              {orgError && <p className="text-sm text-destructive">{orgError}</p>}
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={skipToDashboard}>
-                  <SkipForward className="h-4 w-4 mr-1.5" />
-                  Skip to Dashboard
-                </Button>
-                <Button onClick={createOrg} disabled={creatingOrg}>
+
+              {orgError && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                  {orgError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end">
+                <Button
+                  size="sm"
+                  onClick={createOrg}
+                  disabled={creatingOrg}
+                >
                   {creatingOrg ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Creating
+                    </>
                   ) : (
-                    <>Continue <ArrowRight className="h-4 w-4 ml-1.5" /></>
+                    <>
+                      Continue
+                      <ArrowRight className="size-3.5" />
+                    </>
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
 
-        {/* Step 2: Connect Source */}
-        {step === 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Connect your first source</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Choose a source to start discovering AI assets in your organization.
-              </p>
+          {/* Step 2: Connect Source */}
+          {step === 1 && (
+            <div className="nx-surface space-y-5 p-6">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  Connect your first source
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Pick a source to start discovering AI systems in your stack.
+                  You can add more later.
+                </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setConnectorKind("github")}
-                  className={cn(
-                    "p-4 border rounded-lg text-center transition-colors",
-                    connectorKind === "github"
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
-                  )}
-                >
-                  <span className="text-2xl block mb-1">🐙</span>
-                  <p className="text-sm font-medium">GitHub</p>
-                  <p className="text-xs text-muted-foreground">Scan repos for AI usage</p>
-                </button>
-                <button
-                  onClick={() => setConnectorKind("zapier")}
-                  className={cn(
-                    "p-4 border rounded-lg text-center transition-colors",
-                    connectorKind === "zapier"
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
-                  )}
-                >
-                  <span className="text-2xl block mb-1">⚡</span>
-                  <p className="text-sm font-medium">Zapier</p>
-                  <p className="text-xs text-muted-foreground">Import Zap AI steps</p>
-                </button>
+                {[
+                  {
+                    kind: "github" as const,
+                    label: "GitHub",
+                    body: "Scan repos for AI code",
+                    icon: Code,
+                  },
+                  {
+                    kind: "zapier" as const,
+                    label: "Zapier",
+                    body: "Import AI-powered Zaps",
+                    icon: Zap,
+                  },
+                ].map((opt) => {
+                  const active = connectorKind === opt.kind;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.kind}
+                      type="button"
+                      onClick={() => setConnectorKind(opt.kind)}
+                      className={cn(
+                        "flex items-start gap-3 rounded-md border p-3 text-left transition-colors",
+                        active
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-border hover:border-border-strong",
+                      )}
+                    >
+                      <div className="flex size-8 items-center justify-center rounded-md border border-border bg-muted/40">
+                        <Icon className="size-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold">{opt.label}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {opt.body}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               {connectorKind === "github" && (
-                <>
+                <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label>GitHub Organization</Label>
+                    <label className="text-[12px] font-medium">
+                      GitHub organization
+                    </label>
                     <Input
                       value={githubOrg}
                       onChange={(e) => setGithubOrg(e.target.value)}
                       placeholder="my-company"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      The org name as it appears in github.com/<span className="font-mono">my-company</span>.
+                    <p className="text-[11px] text-muted-foreground">
+                      As it appears in{" "}
+                      <span className="nx-mono">github.com/my-company</span>.
                     </p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Personal Access Token</Label>
+                    <label className="text-[12px] font-medium">
+                      Personal access token
+                    </label>
                     <Input
                       type="password"
                       value={connectorToken}
                       onChange={(e) => setConnectorToken(e.target.value)}
                       placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Needs <span className="font-mono">repo</span> read scope. We encrypt it with AES-256-GCM before storage.
+                    <p className="text-[11px] text-muted-foreground">
+                      Needs <span className="nx-mono">repo</span> read scope.
+                      Encrypted with AES-256-GCM before storage.
                     </p>
                   </div>
-                </>
+                </div>
               )}
 
               {connectorKind === "zapier" && (
                 <div className="space-y-1.5">
-                  <Label>API Key</Label>
+                  <label className="text-[12px] font-medium">API key</label>
                   <Input
                     type="password"
                     value={connectorToken}
                     onChange={(e) => setConnectorToken(e.target.value)}
                     placeholder="zap_xxxxxxxxxxxxxxxxxxxx"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Find it in Zapier Settings → Developer → API Key.
+                  <p className="text-[11px] text-muted-foreground">
+                    Zapier Settings → Developer → API Key.
                   </p>
                 </div>
               )}
 
-              {sourceError && <p className="text-sm text-destructive">{sourceError}</p>}
+              {sourceError && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                  {sourceError}
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setStep(0)}>
-                    <ArrowLeft className="h-4 w-4 mr-1.5" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStep(0)}
+                  >
+                    <ArrowLeft className="size-3.5" />
                     Back
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={skipToDashboard}>
-                    <SkipForward className="h-4 w-4 mr-1.5" />
-                    Skip
-                  </Button>
+                  <button
+                    type="button"
+                    onClick={skipToDashboard}
+                    className="text-[12px] text-muted-foreground hover:text-foreground"
+                  >
+                    Skip for now
+                  </button>
                 </div>
                 <Button
+                  size="sm"
                   onClick={connectSource}
                   disabled={
                     !connectorKind ||
@@ -351,26 +441,33 @@ export default function OnboardingPage() {
                   }
                 >
                   {connectingSource ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying...</>
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Verifying
+                    </>
                   ) : (
-                    <>Connect <ArrowRight className="h-4 w-4 ml-1.5" /></>
+                    <>
+                      Connect
+                      <ArrowRight className="size-3.5" />
+                    </>
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          )}
 
-        {/* Step 3: Invite Team */}
-        {step === 2 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite your team</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Invite colleagues to help manage your AI governance posture.
-              </p>
+          {/* Step 3: Invite Team */}
+          {step === 2 && (
+            <div className="nx-surface space-y-5 p-6">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  Invite your team
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Bring colleagues in to help manage AI governance. You can
+                  skip this and invite them later.
+                </p>
+              </div>
 
               <div className="space-y-2">
                 {inviteEmails.map((email, i) => (
@@ -386,65 +483,90 @@ export default function OnboardingPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeEmail(i)}
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        className="shrink-0 text-muted-foreground"
                       >
-                        &times;
+                        Remove
                       </Button>
                     )}
                   </div>
                 ))}
-                <Button variant="outline" size="sm" onClick={addEmailField}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setInviteEmails([...inviteEmails, ""])}
+                  className="text-muted-foreground"
+                >
                   + Add another
                 </Button>
               </div>
 
               <div className="space-y-1.5">
-                <Label>Role</Label>
+                <label className="text-[12px] font-medium">Role</label>
                 <select
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-background"
+                  className="h-8 w-full rounded-md border border-border bg-transparent px-2 text-[13px]"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
                 >
-                  <option value="viewer">Viewer</option>
-                  <option value="operator">Operator</option>
-                  <option value="admin">Admin</option>
+                  <option value="viewer">Viewer — read-only access</option>
+                  <option value="operator">Operator — can act on findings</option>
+                  <option value="admin">Admin — full access</option>
                 </select>
               </div>
 
-              {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
+              {inviteError && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                  {inviteError}
+                </div>
+              )}
 
               {invitesSent ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-emerald-600 font-medium">Invitations sent successfully!</p>
-                  <Button onClick={skipToDashboard} className="w-full">
-                    Go to Dashboard <ArrowRight className="h-4 w-4 ml-1.5" />
+                  <div className="rounded-md border border-success/20 bg-success/10 px-3 py-2 text-[12px] text-success">
+                    Invitations sent successfully.
+                  </div>
+                  <Button size="sm" className="w-full" onClick={skipToDashboard}>
+                    Go to dashboard
+                    <ArrowRight className="size-3.5" />
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setStep(1)}>
-                      <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setStep(1)}
+                    >
+                      <ArrowLeft className="size-3.5" />
                       Back
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={skipToDashboard}>
-                      <SkipForward className="h-4 w-4 mr-1.5" />
-                      Skip
-                    </Button>
+                    <button
+                      type="button"
+                      onClick={skipToDashboard}
+                      className="text-[12px] text-muted-foreground hover:text-foreground"
+                    >
+                      Skip for now
+                    </button>
                   </div>
-                  <Button onClick={sendInvites} disabled={inviting}>
+                  <Button size="sm" onClick={sendInvites} disabled={inviting}>
                     {inviting ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending...</>
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Sending
+                      </>
                     ) : (
-                      <>Send Invites <ArrowRight className="h-4 w-4 ml-1.5" /></>
+                      <>
+                        Send invites
+                        <ArrowRight className="size-3.5" />
+                      </>
                     )}
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
