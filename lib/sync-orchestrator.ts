@@ -113,7 +113,10 @@ async function getHREmployees(orgId: string): Promise<HREmployee[]> {
       const impl = getConnector(c.kind);
       if (isHRConnector(impl)) {
         const creds = decryptCredentials(c.credentials_encrypted);
-        const {employees} = await impl.fetchEmployees(creds);
+        // Merge config so fields like subdomain/region stored in config
+        // also reach the validator, mirroring the main sync path.
+        const merged = { ...creds, ...((c.config as Record<string, string>) ?? {}) };
+        const {employees} = await impl.fetchEmployees(merged);
         all.push(...employees);
       }
     } catch(e:unknown){ logger.error({connectorId:c.id,e},"HR sync failed"); }
