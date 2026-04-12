@@ -1,2 +1,2 @@
-// Deploy trigger v6 — asset action fix
-export const DEPLOY_VERSION = "v6.2026-04-12-asset-actions-fix";
+// Deploy trigger v7 — auto compliance
+export const DEPLOY_VERSION = "v7.2026-04-12-auto-compliance";
