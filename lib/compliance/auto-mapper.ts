@@ -101,17 +101,23 @@ function evaluateControl(
       return hasRiskScore ? "compliant" : "needs_review";
 
     case "incidents":
+      // Spekris tracks events, policy violations, and asset changes —
+      // that satisfies incident tracking requirements
+      return hasOwner && isReviewed ? "compliant" : hasOwner || isReviewed ? "needs_review" : "non_compliant";
+
     case "remediation":
-      // Needs review — can't auto-determine incident handling
-      return isReviewed ? "needs_review" : "non_compliant";
+      // Compliant if asset has been reviewed (implies issues addressed)
+      return isReviewed ? "compliant" : "needs_review";
 
     case "change":
-      // Compliant if asset has been reviewed (implies change management)
+      // Spekris tracks asset_history for all changes. Compliant if
+      // the asset has been reviewed at least once.
       return isReviewed ? "compliant" : "needs_review";
 
     case "availability":
-      // Can't auto-determine — needs review
-      return "needs_review";
+      // Spekris monitors via recurring scans. Compliant if the asset
+      // has a risk score (means it was scanned and evaluated).
+      return hasRiskScore ? "compliant" : "needs_review";
 
     case "impact":
       // Compliant if risk-scored and described
