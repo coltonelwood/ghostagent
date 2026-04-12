@@ -54,7 +54,20 @@ function InviteContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     });
-    const data = await res.json() as { error?: string };
+
+    // If the user isn't signed in yet, bounce them through the magic-link
+    // flow with a redirectTo back to this exact invite page so the token
+    // survives the round trip. After they sign in and the callback
+    // redirects them, they'll land here again and can click Accept.
+    if (res.status === 401) {
+      const returnPath = `/invite?token=${encodeURIComponent(token ?? "")}`;
+      router.push(
+        `/auth/login?redirectTo=${encodeURIComponent(returnPath)}`,
+      );
+      return;
+    }
+
+    const data = (await res.json()) as { error?: string };
     if (!res.ok) {
       setState("error");
       setErrorMsg(data.error ?? "Failed to accept invitation.");

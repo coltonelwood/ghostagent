@@ -2,6 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Early-return on the auth callback path. The callback route handler
+  // owns `exchangeCodeForSession` and attaches session cookies to its
+  // own response — if this middleware also constructs a Supabase client
+  // here, we risk racing the callback for cookie state. Simpler and
+  // correct: let the route handler own the callback fully.
+  if (pathname.startsWith("/auth/callback")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -14,22 +25,20 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   // Routes that require authentication
   const protectedRoute =
@@ -40,6 +49,12 @@ export async function proxy(request: NextRequest) {
   if (!user && protectedRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    // Preserve where the user was headed so login can send them back
+    // on success. Skip for the two "home" destinations since they're
+    // the default landings anyway.
+    if (pathname !== "/platform" && pathname !== "/onboarding") {
+      url.searchParams.set("redirectTo", pathname);
+    }
     return NextResponse.redirect(url);
   }
 
@@ -59,8 +74,12 @@ export const config = {
     "/platform/:path*",
     "/onboarding/:path*",
     "/scan/:path*",
-    "/auth/:path*",
-    // Exclude static files and API routes (Stripe webhook needs raw body)
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/internal).*)",
+    // Only the login page — not the entire /auth tree — so the
+    // callback route is never intercepted by this middleware.
+    "/auth/login",
+    // Exclude static files, internal/webhook routes, and the auth
+    // callback. The callback must remain free of middleware
+    // interference so its response-bound cookies reach the browser.
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/internal|auth/callback).*)",
   ],
 };

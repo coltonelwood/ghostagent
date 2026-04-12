@@ -22,16 +22,35 @@ function safeRedirectPath(value: string | null): string | null {
   return value;
 }
 
+/**
+ * Map of callback error slugs (set by /auth/callback/route.ts) to
+ * friendly, actionable explanations. Keeps the login page from
+ * rendering a raw error slug and gives the user a clear next step.
+ */
+const CALLBACK_ERROR_MESSAGES: Record<string, string> = {
+  no_code: "The sign-in link didn't carry a valid code. Try requesting a new link below.",
+  exchange_failed:
+    "That sign-in link has already been used or has expired. Request a fresh one below.",
+  provider_error:
+    "Our authentication provider returned an error. Please request a new link and try again.",
+};
+
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawRedirectTo = searchParams.get("redirectTo");
   const safeRedirect = safeRedirectPath(rawRedirectTo);
 
+  const callbackError = searchParams.get("error");
+  const initialError = callbackError
+    ? CALLBACK_ERROR_MESSAGES[callbackError] ??
+      "We couldn't complete sign-in. Please request a new link below."
+    : "";
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
 
   // Redirect already-authenticated users to their intended destination
   // (or /platform) — same safe-path check prevents off-site jumps.
