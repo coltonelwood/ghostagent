@@ -7,7 +7,12 @@ import {
   buildNormalizedAsset,
   classifyFilePathContext,
   looksLikeAIFrameworkRepo,
+  extractAIDependenciesFromManifest,
+  extractAIEnvVarsFromFile,
+  AI_MANIFEST_PATHS,
+  ENV_EXAMPLE_PATHS,
   type FilePathContext,
+  type ManifestMatch,
 } from "./base";
 import { withRetry } from "../retry";
 import { logger } from "../logger";
@@ -98,6 +103,29 @@ export class GitHubConnector implements NexusConnector {
           full_name: repo.full_name,
           description: repo.description,
         });
+
+        // Two cheap hidden-AI passes BEFORE the code search — a
+        // declared dependency or an env-var entry in `.env.example`
+        // is the strongest possible signal that a repo uses AI,
+        // even if no code file explicitly imports an LLM library.
+        const manifestAsset = await this.scanManifests(
+          octokit,
+          org,
+          repo.name,
+          repo.html_url,
+          framework.isFramework,
+        );
+        if (manifestAsset) assets.push(manifestAsset);
+
+        const envAsset = await this.scanEnvExample(
+          octokit,
+          org,
+          repo.name,
+          repo.html_url,
+          framework.isFramework,
+        );
+        if (envAsset) assets.push(envAsset);
+
         const repoAssets = await this.scanRepo(
           octokit,
           org,
@@ -118,6 +146,137 @@ export class GitHubConnector implements NexusConnector {
 
     logger.info({ org, repos: repos.length, assets: assets.length, errors: errors.length }, "github: sync complete");
     return { assets, errors, metadata: { org, reposScanned: repos.length } };
+  }
+
+  /**
+   * Scan a repo's dependency manifests (package.json, pyproject.toml,
+   * requirements.txt, etc.) for AI-related packages. Returns a single
+   * normalized asset summarizing everything declared in every manifest,
+   * or null if nothing was found.
+   *
+   * This catches the "wrapper module" case where a shared file calls
+   * OpenAI and every downstream caller uses the wrapper — code search
+   * only finds the one wrapper file, but the declared dependency is
+   * unambiguous.
+   */
+  private async scanManifests(
+    octokit: Octokit,
+    org: string,
+    repo: string,
+    repoUrl: string,
+    isFrameworkRepo: boolean,
+  ): Promise<NormalizedAsset | null> {
+    const matches: ManifestMatch[] = [];
+    for (const manifestPath of AI_MANIFEST_PATHS) {
+      try {
+        const { data } = await octokit.rest.repos.getContent({
+          owner: org,
+          repo,
+          path: manifestPath,
+        });
+        if (!("content" in data && data.content)) continue;
+        if ((data as { encoding?: string }).encoding !== "base64") continue;
+        let content: string;
+        try {
+          content = Buffer.from(data.content, "base64").toString("utf8");
+        } catch {
+          continue;
+        }
+        // Cap manifest size to avoid pathological `package-lock.json`-sized files.
+        if (content.length > 500_000) continue;
+        matches.push(...extractAIDependenciesFromManifest(manifestPath, content));
+      } catch {
+        // No such manifest, or unreadable — move on.
+      }
+    }
+
+    if (matches.length === 0) return null;
+
+    // Dedupe providers across manifests so a project listing the same
+    // library in both pyproject.toml and requirements.txt counts once.
+    const providers = Array.from(new Set(matches.map((m) => m.provider)));
+    const manifestsWithHits = Array.from(new Set(matches.map((m) => m.manifestPath)));
+    const externalId = `${org}/${repo}:manifest`;
+    const primaryManifest = manifestsWithHits[0];
+
+    return buildNormalizedAsset({
+      externalId,
+      name: `${repo} — declared AI dependencies`,
+      description: `Repository declares ${providers.length} AI provider${providers.length === 1 ? "" : "s"} in its dependency manifest${manifestsWithHits.length === 1 ? "" : "s"}: ${providers.join(", ")}. This is a strong hidden-AI signal even without any code import.`,
+      kind: "integration",
+      sourceUrl: `${repoUrl}/blob/HEAD/${primaryManifest}`,
+      environment: isFrameworkRepo ? "development" : "production",
+      aiServices: providers.map((p) => ({ provider: p })),
+      dataClassification: isFrameworkRepo ? ["internal"] : ["unknown"],
+      tags: [repo, org, "declared-dependency", ...(isFrameworkRepo ? ["framework-internals"] : [])],
+      rawMetadata: {
+        org,
+        repo,
+        manifestPaths: manifestsWithHits,
+        providers,
+        source: "manifest",
+        frameworkRepo: isFrameworkRepo,
+      },
+    });
+  }
+
+  /**
+   * Scan `.env.example` / `.env.sample` / `.env.template` for AI-related
+   * env var declarations. A committed env-var stub is the clearest
+   * possible signal — the team already decided to ship this feature.
+   * Returns a single summarizing asset or null.
+   */
+  private async scanEnvExample(
+    octokit: Octokit,
+    org: string,
+    repo: string,
+    repoUrl: string,
+    isFrameworkRepo: boolean,
+  ): Promise<NormalizedAsset | null> {
+    for (const envPath of ENV_EXAMPLE_PATHS) {
+      try {
+        const { data } = await octokit.rest.repos.getContent({
+          owner: org,
+          repo,
+          path: envPath,
+        });
+        if (!("content" in data && data.content)) continue;
+        if ((data as { encoding?: string }).encoding !== "base64") continue;
+        let content: string;
+        try {
+          content = Buffer.from(data.content, "base64").toString("utf8");
+        } catch {
+          continue;
+        }
+        if (content.length > 200_000) continue;
+
+        const providers = extractAIEnvVarsFromFile(content);
+        if (providers.length === 0) continue;
+
+        return buildNormalizedAsset({
+          externalId: `${org}/${repo}:env-example`,
+          name: `${repo} — AI env vars in ${envPath}`,
+          description: `${envPath} declares env vars for ${providers.length} AI provider${providers.length === 1 ? "" : "s"}: ${providers.join(", ")}. The team has already wired this as an operational feature — look for the corresponding deployment and owner.`,
+          kind: "integration",
+          sourceUrl: `${repoUrl}/blob/HEAD/${envPath}`,
+          environment: isFrameworkRepo ? "development" : "production",
+          aiServices: providers.map((p) => ({ provider: p })),
+          dataClassification: isFrameworkRepo ? ["internal"] : ["unknown"],
+          tags: [repo, org, "declared-env-var", ...(isFrameworkRepo ? ["framework-internals"] : [])],
+          rawMetadata: {
+            org,
+            repo,
+            envPath,
+            providers,
+            source: "env-example",
+            frameworkRepo: isFrameworkRepo,
+          },
+        });
+      } catch {
+        // No such env file — try the next one.
+      }
+    }
+    return null;
   }
 
   private async scanRepo(
