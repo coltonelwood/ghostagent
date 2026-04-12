@@ -32,7 +32,7 @@ const REPORTS: ReportMeta[] = [
   {
     id: "compliance_report",
     name: "Compliance Summary",
-    description: "Control coverage across HIPAA, SOC 2, EU AI Act, and ISO 42001 — suitable for auditor review",
+    description: "Control coverage across EU AI Act, SOC 2, ISO 42001, and NIST AI RMF — suitable for auditor review",
     badge: "Markdown",
     icon: "CS",
   },
