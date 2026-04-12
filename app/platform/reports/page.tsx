@@ -25,7 +25,7 @@ const REPORTS: ReportMeta[] = [
   {
     id: "risk_report",
     name: "Risk Assessment",
-    description: "Every AI asset by risk level. Includes ownership status, days since last review, and connected services",
+    description: "All discovered AI assets by risk level. Includes ownership status, days since last review, and connected services",
     badge: "Markdown",
     icon: "RA",
   },
