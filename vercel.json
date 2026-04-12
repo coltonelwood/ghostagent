@@ -11,6 +11,9 @@
     },
     "app/api/internal/sync-schedule/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/internal/threat-worker/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -21,6 +24,10 @@
     {
       "path": "/api/internal/sync-worker",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/threat-worker",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

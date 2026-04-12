@@ -234,7 +234,7 @@ export interface PolicyConditionGroup {
 export type PolicyCondition = PolicyConditionGroup;
 
 export interface PolicyAction {
-  type: 'alert_owner' | 'alert_admin' | 'alert_slack' | 'alert_webhook' | 'create_task' | 'mark_flagged' | 'quarantine';
+  type: 'alert_owner' | 'alert_admin' | 'alert_slack' | 'alert_webhook' | 'create_task' | 'mark_flagged' | 'quarantine' | 'deploy_countermeasure';
   config?: Record<string, unknown>;
 }
 
@@ -294,7 +294,11 @@ export type EventKind =
   | 'compliance_gap' | 'compliance_resolved'
   | 'connector_sync_started' | 'connector_sync_completed' | 'connector_sync_failed'
   | 'task_created' | 'task_completed'
-  | 'member_invited' | 'member_joined' | 'member_removed';
+  | 'member_invited' | 'member_joined' | 'member_removed'
+  | 'threat_detected' | 'threat_shared' | 'threat_received' | 'threat_corroborated'
+  | 'prediction_generated' | 'prediction_hit'
+  | 'countermeasure_deployed' | 'countermeasure_rolled_back'
+  | 'genome_updated' | 'network_joined';
 
 export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 
@@ -503,6 +507,8 @@ export interface PlanLimits {
   apiAccess: boolean;
   sso: boolean;
   multiUser: boolean;
+  collectiveDefense: boolean;
+  maxThreatReports: number; // -1 = unlimited
 }
 
 // ---- Analytics ----

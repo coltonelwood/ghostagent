@@ -7,6 +7,8 @@ export interface PlanLimits {
   apiAccess: boolean;
   sso: boolean;
   multiUser: boolean;
+  collectiveDefense: boolean;
+  maxThreatReports: number; // -1 = unlimited
 }
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
@@ -17,6 +19,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
     apiAccess: false,
     sso: false,
     multiUser: true,
+    collectiveDefense: false,
+    maxThreatReports: 0,
   },
   professional: {
     maxAssets: 500,
@@ -25,6 +29,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
     apiAccess: true,
     sso: false,
     multiUser: true,
+    collectiveDefense: true,
+    maxThreatReports: 50,
   },
   enterprise: {
     maxAssets: -1,
@@ -33,6 +39,8 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
     apiAccess: true,
     sso: true,
     multiUser: true,
+    collectiveDefense: true,
+    maxThreatReports: -1,
   },
 };
 
@@ -56,6 +64,11 @@ export function canAccessFramework(org: Organization, frameworkCode: string): bo
   const limits = getPlanLimits(org);
   if (limits.frameworks === "all") return true;
   return (limits.frameworks as string[]).includes(frameworkCode);
+}
+
+export function canAccessCollectiveDefense(org: Organization): boolean {
+  const limits = getPlanLimits(org);
+  return limits.collectiveDefense;
 }
 
 export class EntitlementError extends Error {

@@ -25,6 +25,11 @@ function getField(a: Asset, field: string): FieldVal {
       return Math.floor((Date.now()-new Date(a.last_seen_at).getTime())/86400000);
     case "ai_provider":
       return (a.ai_services??[]).map(s=>s.provider.toLowerCase());
+    // Collective defense fields — enable policies based on network threat intelligence
+    case "threat_exposure_score":
+      return (a as Asset & { _threat_exposure_score?: number })._threat_exposure_score ?? 0;
+    case "active_predictions_count":
+      return (a as Asset & { _active_predictions_count?: number })._active_predictions_count ?? 0;
     default: return undefined;
   }
 }
@@ -210,6 +215,17 @@ async function dispatchPolicyActions(policy: Policy, asset: Asset, orgId: string
             orgId, kind: "asset_quarantined", severity: "critical",
             title: "Asset quarantined by policy: " + policy.name,
             assetId: asset.id, policyId: policy.id,
+          });
+          break;
+        }
+        case "deploy_countermeasure": {
+          // Collective defense: emit event for manual countermeasure review
+          await emitEvent({
+            orgId, kind: "countermeasure_deployed", severity: policy.severity,
+            title: "Countermeasure triggered by policy: " + policy.name,
+            body: "Asset " + asset.name + " triggered an automated countermeasure deployment.",
+            assetId: asset.id, policyId: policy.id,
+            metadata: { action: "deploy_countermeasure", asset_risk: asset.risk_level },
           });
           break;
         }

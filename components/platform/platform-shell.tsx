@@ -27,6 +27,9 @@ import {
   Database,
   Plug,
   Shield,
+  ShieldAlert,
+  Globe,
+  Zap,
   Bell,
   ClipboardCheck,
   FileText,
@@ -69,6 +72,14 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/platform/policies", label: "Policies", icon: Shield },
       { href: "/platform/compliance", label: "Compliance", icon: ClipboardCheck },
       { href: "/platform/reports", label: "Reports", icon: FileText },
+    ],
+  },
+  {
+    label: "Defend",
+    items: [
+      { href: "/platform/threats", label: "Threat Intel", icon: ShieldAlert },
+      { href: "/platform/network", label: "Network", icon: Globe },
+      { href: "/platform/immunity", label: "Immunity", icon: Zap },
     ],
   },
   {

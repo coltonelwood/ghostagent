@@ -107,7 +107,7 @@ const DIMS: Dim[] = [
   },
   {
     name: "staleness",
-    weight: 0.08,
+    weight: 0.06,
     score(_, ctx) {
       const d = ctx.daysSinceLastSeen;
       if (d > 365) return { score: 90, explanation: `Not seen in ${d} days` };
@@ -149,7 +149,7 @@ const DIMS: Dim[] = [
   },
   {
     name: "unreviewed_changes",
-    weight: 0.05,
+    weight: 0.03,
     score(_, ctx) {
       const d = ctx.daysSinceReview;
       if (!isFinite(d)) return { score: 80, explanation: "Never reviewed" };
@@ -180,6 +180,20 @@ const DIMS: Dim[] = [
       if (svcs.some((s) => s.includes("deprecated") || s === "unknown"))
         return { score: 80, explanation: "Deprecated or unknown provider" };
       return { score: 0, explanation: "Known active providers" };
+    },
+  },
+  {
+    name: "threat_exposure",
+    weight: 0.05,
+    score(a, ctx) {
+      // Collective defense dimension: checks if this asset's profile
+      // matches active threats observed across the network. The actual
+      // threat count is injected via RiskContext.activeThreatCount.
+      const threats = (ctx as RiskContext & { activeThreatCount?: number }).activeThreatCount ?? 0;
+      if (threats === 0) return { score: 0, explanation: "No active network threats matching this profile" };
+      if (threats >= 5) return { score: 90, explanation: `${threats} active network threats match this asset's profile` };
+      if (threats >= 2) return { score: 60, explanation: `${threats} active network threats match this asset's profile` };
+      return { score: 35, explanation: "1 active network threat matches this asset's profile" };
     },
   },
 ];

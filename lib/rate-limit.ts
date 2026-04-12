@@ -238,6 +238,18 @@ export const sdkIngestRateLimiter = new RateLimiter({
   max: 600, // 600 assets/minute/org
 });
 
+export const threatRateLimiter = new RateLimiter({
+  name: "threat",
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests/minute per user
+});
+
+export const networkRateLimiter = new RateLimiter({
+  name: "network",
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 requests/minute per user
+});
+
 // Auto-purge the in-memory fallback every 10 minutes to prevent memory growth.
 if (typeof setInterval !== "undefined") {
   setInterval(
@@ -249,6 +261,8 @@ if (typeof setInterval !== "undefined") {
       syncRateLimiter.purge();
       exportRateLimiter.purge();
       sdkIngestRateLimiter.purge();
+      threatRateLimiter.purge();
+      networkRateLimiter.purge();
     },
     10 * 60 * 1000,
   );
