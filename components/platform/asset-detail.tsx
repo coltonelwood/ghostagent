@@ -17,6 +17,8 @@ import {
   ExternalLink,
   RefreshCw,
   AlertTriangle,
+  Circle,
+  Info,
 } from "lucide-react";
 
 const RISK_BADGE_CLASS: Record<string, string> = {
@@ -65,6 +67,177 @@ interface AssetData {
   last_seen_at: string;
   raw_metadata: Record<string, unknown> | null;
 }
+
+function generateWhyThisMatters(asset: AssetData): {
+  headline: string;
+  detail: string;
+  severity: "critical" | "warning" | "info";
+} {
+  if (asset.risk_level === "critical" && asset.owner_status === "orphaned") {
+    return {
+      headline: "Critical risk with no owner",
+      detail:
+        "This AI system is high-risk and has no one accountable for it. If something goes wrong, there is no clear person to respond.",
+      severity: "critical",
+    };
+  }
+  if (asset.risk_level === "critical") {
+    return {
+      headline: "This system poses significant governance risk",
+      detail:
+        "Based on its environment, data access, and ownership status, this system requires immediate attention.",
+      severity: "critical",
+    };
+  }
+  if (asset.owner_status === "orphaned" && asset.environment === "production") {
+    return {
+      headline: "Production AI with no owner",
+      detail:
+        "This system is running in production with no one responsible for it. Any issues would go unnoticed.",
+      severity: "critical",
+    };
+  }
+  if (asset.owner_status === "orphaned") {
+    return {
+      headline: "No one is responsible for this AI system",
+      detail:
+        "Without a clear owner, this system can't be properly governed, updated, or responded to if issues arise.",
+      severity: "warning",
+    };
+  }
+  if (asset.risk_level === "high") {
+    return {
+      headline: "This system needs governance attention",
+      detail:
+        "Elevated risk factors were detected. Review the risk breakdown below and take appropriate action.",
+      severity: "warning",
+    };
+  }
+  const dcLower = asset.data_classification.map((d) => d.toLowerCase());
+  if (
+    asset.environment === "production" &&
+    (dcLower.includes("pii") || dcLower.includes("phi"))
+  ) {
+    return {
+      headline: "AI system handling sensitive data in production",
+      detail:
+        "This system may be processing personal or protected data. Ensure proper oversight and documentation.",
+      severity: "warning",
+    };
+  }
+  if (asset.kind === "agent") {
+    return {
+      headline: "Autonomous AI agent detected",
+      detail:
+        "Agent-type systems can take actions independently. Ensure appropriate guardrails and oversight are in place.",
+      severity: "warning",
+    };
+  }
+  return {
+    headline: "AI system detected",
+    detail:
+      "Review the details below to understand this system's role and ensure proper governance.",
+    severity: "info",
+  };
+}
+
+const APPROVED_PROVIDERS = ["openai", "anthropic", "google", "azure"];
+
+function generateActions(asset: AssetData): string[] {
+  const actions: string[] = [];
+
+  if (asset.owner_status === "orphaned" || asset.owner_status === "unknown_owner") {
+    actions.push("Assign an owner who is accountable for this system");
+  }
+  if (asset.review_status !== "reviewed") {
+    actions.push("Review this system and mark it as reviewed");
+  }
+  if (asset.risk_level === "critical" || asset.risk_level === "high") {
+    actions.push(
+      "Examine the risk breakdown and address the highest-scoring dimensions"
+    );
+  }
+  const dcLower = asset.data_classification.map((d) => d.toLowerCase());
+  if (
+    asset.environment === "production" &&
+    (dcLower.includes("pii") || dcLower.includes("phi") || dcLower.includes("financial"))
+  ) {
+    actions.push(
+      "Verify that sensitive data handling has proper oversight and documentation"
+    );
+  }
+  if (
+    asset.ai_services.length > 0 &&
+    asset.ai_services.some(
+      (svc) => !APPROVED_PROVIDERS.includes(svc.provider.toLowerCase())
+    )
+  ) {
+    actions.push(
+      "Validate that this AI provider is approved for use in your organization"
+    );
+  }
+  if (asset.kind === "agent") {
+    actions.push(
+      "Confirm that appropriate guardrails are in place for this autonomous system"
+    );
+  }
+  if (actions.length < 3) {
+    actions.push("Document the purpose and scope of this system");
+  }
+
+  return actions.slice(0, 3);
+}
+
+function getEvidenceSummary(asset: AssetData): {
+  source: string;
+  confidence: string;
+  details: string[];
+} {
+  const rm = asset.raw_metadata ?? {};
+
+  const SOURCE_MAP: Record<string, string> = {
+    manifest: "Dependency manifest",
+    "env-example": "Environment variable file",
+    code: "Source code analysis",
+  };
+  const rawSource = typeof rm.source === "string" ? rm.source : "";
+  const source = SOURCE_MAP[rawSource] ?? "Code scan";
+
+  let confidence: string;
+  if (typeof rm.confidence === "string") {
+    confidence = rm.confidence;
+  } else if (typeof rm.confidence === "number") {
+    confidence = rm.confidence >= 80 ? "High" : rm.confidence >= 50 ? "Medium" : "Low";
+  } else {
+    confidence =
+      asset.risk_score >= 80 ? "High" : asset.risk_score >= 50 ? "Medium" : "Low";
+  }
+
+  const details: string[] = [];
+  if (typeof rm.filePath === "string") {
+    details.push(`Found in: ${rm.filePath}`);
+  }
+  if (Array.isArray(rm.providers)) {
+    details.push(`Providers: ${(rm.providers as string[]).join(", ")}`);
+  }
+  if (Array.isArray(rm.manifestPaths)) {
+    details.push(`Manifests: ${(rm.manifestPaths as string[]).join(", ")}`);
+  }
+
+  return { source, confidence, details };
+}
+
+const SEVERITY_BORDER: Record<string, string> = {
+  critical: "border-l-red-500",
+  warning: "border-l-yellow-500",
+  info: "border-l-blue-500",
+};
+
+const CONFIDENCE_BADGE: Record<string, string> = {
+  High: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  Low: "bg-muted text-muted-foreground border-border",
+};
 
 function MetadataRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -235,6 +408,75 @@ export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
 
         {/* ── Overview ── */}
         <TabsContent value="overview" className="space-y-4 pt-2">
+          {/* Why this matters */}
+          {(() => {
+            const wtm = generateWhyThisMatters(asset);
+            return (
+              <Card
+                className={`border-l-4 ${SEVERITY_BORDER[wtm.severity] ?? "border-l-blue-500"}`}
+              >
+                <CardContent className="py-4">
+                  <p className="font-bold text-sm">{wtm.headline}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{wtm.detail}</p>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* What you should do */}
+          {(() => {
+            const actions = generateActions(asset);
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">What you should do</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {actions.map((action, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <Circle className="size-4 shrink-0 mt-0.5 text-muted-foreground" />
+                      <span className="text-sm">{action}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Detection evidence */}
+          {(() => {
+            const evidence = getEvidenceSummary(asset);
+            return (
+              <Card>
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Info className="size-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium">
+                      Detected via: {evidence.source}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={
+                        CONFIDENCE_BADGE[evidence.confidence] ?? CONFIDENCE_BADGE.Low
+                      }
+                    >
+                      {evidence.confidence} confidence
+                    </Badge>
+                  </div>
+                  {evidence.details.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {evidence.details.map((d, i) => (
+                        <li key={i} className="text-xs text-muted-foreground">
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Core details */}
             <Card>

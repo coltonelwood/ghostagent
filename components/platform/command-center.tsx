@@ -588,6 +588,40 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
 }
 
 // --------------------------------------------------------------------------
+// Ownership Coverage metric
+// --------------------------------------------------------------------------
+
+function OwnershipCoverage({ analytics }: { analytics: AnalyticsData }) {
+  const owned = analytics.totalAssets - analytics.orphanedAssets;
+  const pct = analytics.totalAssets > 0 ? Math.round((owned / analytics.totalAssets) * 100) : 0;
+  const barColor = pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-destructive";
+  const textColor = pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
+
+  return (
+    <Link
+      href="/platform/assets?owner=orphaned"
+      className="nx-surface flex items-center gap-5 p-5 transition-colors hover:border-border-strong"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[13px] font-semibold tracking-tight">AI Ownership Coverage</h3>
+          <span className={cn("text-lg font-bold nx-tabular", textColor)}>{pct}%</span>
+        </div>
+        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
+          <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
+        </div>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {owned} of {analytics.totalAssets} AI system{analytics.totalAssets === 1 ? "" : "s"} have a clear owner.
+          {analytics.orphanedAssets > 0 && (
+            <span className="font-medium text-foreground"> {analytics.orphanedAssets} need attention.</span>
+          )}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// --------------------------------------------------------------------------
 // Main dashboard — the control plane
 // --------------------------------------------------------------------------
 
@@ -621,6 +655,9 @@ export function CommandCenterDashboard({
 
       {/* Phase 1 — Signal cards */}
       <SignalCards analytics={analytics} />
+
+      {/* Ownership coverage */}
+      <OwnershipCoverage analytics={analytics} />
 
       {/* Phase 3 — Highest risk systems */}
       <HighestRiskSystems assets={analytics.topRiskAssets} />
