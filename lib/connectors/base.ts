@@ -572,17 +572,32 @@ export const AI_DEPENDENCY_PATTERNS: AIDependency[] = [
   { provider: "openai", pattern: /ruby-openai/i },
   { provider: "openai", pattern: /go-openai/i },
   { provider: "openai", pattern: /openai\.api_key/i },
+  // Rust async-openai crate
+  { provider: "openai", pattern: /\basync-openai\s*=/i },
+  // JVM: official openai-java or community Kotlin clients
+  { provider: "openai", pattern: /["'`]com\.openai:openai-java["'`]/i },
+  { provider: "openai", pattern: /openai-kotlin/i },
+  // Elixir mix dep
+  { provider: "openai", pattern: /:openai,\s*"~>/i },
+  { provider: "openai", pattern: /:ex_openai,\s*"~>/i },
 
   // Anthropic
   { provider: "anthropic", pattern: /["'`]@anthropic-ai\/sdk["'`]/i },
   { provider: "anthropic", pattern: /["'`]anthropic["'`]/i },
   { provider: "anthropic", pattern: /anthropic-sdk-\w+/i },
+  // Rust
+  { provider: "anthropic", pattern: /\banthropic-sdk\s*=/i },
+  // JVM
+  { provider: "anthropic", pattern: /com\.anthropic:anthropic/i },
 
   // LangChain family
   { provider: "langchain", pattern: /["'`]langchain["'`]/i },
   { provider: "langchain", pattern: /["'`]@langchain\/\w+/i },
   { provider: "langchain", pattern: /langchaingo/i },
   { provider: "langchain", pattern: /langchainrb/i },
+  // JVM: langchain4j
+  { provider: "langchain", pattern: /dev\.langchain4j:langchain4j/i },
+  { provider: "langchain", pattern: /langchain4j-core/i },
 
   // Other LLM / ML SDKs
   { provider: "llamaindex", pattern: /["'`](llama[-_]?index|@llamaindex\/\w+)["'`]/i },
@@ -605,29 +620,51 @@ export const AI_DEPENDENCY_PATTERNS: AIDependency[] = [
   // Framework-adjacent inference
   { provider: "ollama", pattern: /["'`]ollama["'`]/i },
   { provider: "openrouter", pattern: /["'`]openrouter["'`]/i },
+
+  // Dockerfile FROM clauses pulling AI-specific base images. These
+  // match raw Dockerfile lines, not quoted package names, so the
+  // pattern starts with a word boundary.
+  { provider: "ollama", pattern: /^FROM\s+ollama\//im },
+  { provider: "huggingface", pattern: /^FROM\s+huggingface\//im },
+  { provider: "vllm", pattern: /^FROM\s+vllm\//im },
+  { provider: "nvidia-inference", pattern: /^FROM\s+nvcr\.io\/nvidia\/(tritonserver|tensorrt-llm)/im },
+
+  // Terraform resources — cloud LLM endpoints declared in IaC
+  { provider: "openai", pattern: /resource\s+"aws_bedrock_/i },
+  { provider: "google", pattern: /resource\s+"google_vertex_ai_/i },
+  { provider: "openai", pattern: /resource\s+"azurerm_cognitive_/i },
 ];
 
 /**
  * Env var names that indicate "this project uses AI". A match in
- * `.env.example` is a strong signal even without any code hits.
+ * `.env.example`, `docker-compose.yml`, or `.github/workflows/*.yml`
+ * is a strong hidden-AI signal even without any code hits.
+ *
+ * Each pattern matches both `VAR=value` (dotenv / bash syntax) and
+ * `VAR: value` (YAML syntax for GitHub Actions / Docker compose /
+ * Kubernetes manifests). A trailing `[=:]` after the var name is the
+ * key separator — we allow either.
+ *
+ * The `-` prefix handling covers the YAML sequence form
+ * `- OPENAI_API_KEY=...` used by some Compose variants.
  */
 export const AI_ENV_VAR_PATTERNS: Array<{ provider: string; pattern: RegExp }> = [
-  { provider: "openai", pattern: /^\s*OPENAI_API_KEY\s*=/im },
-  { provider: "openai", pattern: /^\s*AZURE_OPENAI_(API_KEY|ENDPOINT|DEPLOYMENT)\s*=/im },
-  { provider: "openai", pattern: /^\s*OPENAI_ORG(ANIZATION)?\s*=/im },
-  { provider: "anthropic", pattern: /^\s*ANTHROPIC_API_KEY\s*=/im },
-  { provider: "anthropic", pattern: /^\s*CLAUDE_API_KEY\s*=/im },
-  { provider: "google", pattern: /^\s*(GOOGLE_AI|GEMINI|GOOGLE_GENERATIVE_AI)_API_KEY\s*=/im },
-  { provider: "google", pattern: /^\s*VERTEX_AI_(PROJECT|LOCATION)\s*=/im },
-  { provider: "huggingface", pattern: /^\s*(HUGGINGFACE|HF)_(API_KEY|TOKEN|HUB_TOKEN)\s*=/im },
-  { provider: "cohere", pattern: /^\s*COHERE_API_KEY\s*=/im },
-  { provider: "replicate", pattern: /^\s*REPLICATE_API_(TOKEN|KEY)\s*=/im },
-  { provider: "groq", pattern: /^\s*GROQ_API_KEY\s*=/im },
-  { provider: "together-ai", pattern: /^\s*TOGETHER_(AI_)?API_KEY\s*=/im },
-  { provider: "mistral", pattern: /^\s*MISTRAL_API_KEY\s*=/im },
-  { provider: "perplexity", pattern: /^\s*PERPLEXITY_API_KEY\s*=/im },
-  { provider: "openrouter", pattern: /^\s*OPENROUTER_API_KEY\s*=/im },
-  { provider: "ollama", pattern: /^\s*OLLAMA_(HOST|BASE_URL)\s*=/im },
+  { provider: "openai", pattern: /(^|\n)\s*-?\s*OPENAI_API_KEY\s*[=:]/i },
+  { provider: "openai", pattern: /(^|\n)\s*-?\s*AZURE_OPENAI_(API_KEY|ENDPOINT|DEPLOYMENT)\s*[=:]/i },
+  { provider: "openai", pattern: /(^|\n)\s*-?\s*OPENAI_ORG(ANIZATION)?\s*[=:]/i },
+  { provider: "anthropic", pattern: /(^|\n)\s*-?\s*ANTHROPIC_API_KEY\s*[=:]/i },
+  { provider: "anthropic", pattern: /(^|\n)\s*-?\s*CLAUDE_API_KEY\s*[=:]/i },
+  { provider: "google", pattern: /(^|\n)\s*-?\s*(GOOGLE_AI|GEMINI|GOOGLE_GENERATIVE_AI)_API_KEY\s*[=:]/i },
+  { provider: "google", pattern: /(^|\n)\s*-?\s*VERTEX_AI_(PROJECT|LOCATION)\s*[=:]/i },
+  { provider: "huggingface", pattern: /(^|\n)\s*-?\s*(HUGGINGFACE|HF)_(API_KEY|TOKEN|HUB_TOKEN)\s*[=:]/i },
+  { provider: "cohere", pattern: /(^|\n)\s*-?\s*COHERE_API_KEY\s*[=:]/i },
+  { provider: "replicate", pattern: /(^|\n)\s*-?\s*REPLICATE_API_(TOKEN|KEY)\s*[=:]/i },
+  { provider: "groq", pattern: /(^|\n)\s*-?\s*GROQ_API_KEY\s*[=:]/i },
+  { provider: "together-ai", pattern: /(^|\n)\s*-?\s*TOGETHER_(AI_)?API_KEY\s*[=:]/i },
+  { provider: "mistral", pattern: /(^|\n)\s*-?\s*MISTRAL_API_KEY\s*[=:]/i },
+  { provider: "perplexity", pattern: /(^|\n)\s*-?\s*PERPLEXITY_API_KEY\s*[=:]/i },
+  { provider: "openrouter", pattern: /(^|\n)\s*-?\s*OPENROUTER_API_KEY\s*[=:]/i },
+  { provider: "ollama", pattern: /(^|\n)\s*-?\s*OLLAMA_(HOST|BASE_URL)\s*[=:]/i },
 ];
 
 export interface ManifestMatch {
@@ -674,6 +711,13 @@ export function extractAIEnvVarsFromFile(content: string): string[] {
  * first one we find per ecosystem so we don't double-count a project
  * that lists the same dependency in both pyproject.toml and
  * requirements.txt.
+ *
+ * The list includes non-traditional "manifests" — Dockerfiles and
+ * Terraform files aren't dependency manifests in the classic sense,
+ * but they are the canonical place an engineer declares infrastructure
+ * that uses AI (model containers, cloud LLM endpoints). Treating them
+ * in the same sweep catches the cron/infra cases where a customer's
+ * AI usage isn't in any package file at all.
  */
 export const AI_MANIFEST_PATHS: readonly string[] = [
   "package.json",
@@ -687,14 +731,47 @@ export const AI_MANIFEST_PATHS: readonly string[] = [
   "Cargo.toml",
   "build.gradle",
   "pom.xml",
+  // JVM Kotlin
+  "build.gradle.kts",
+  // Elixir
+  "mix.exs",
+  // Infrastructure — common locations only
+  "Dockerfile",
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yaml",
+  "main.tf",
+  "infrastructure/main.tf",
+  "terraform/main.tf",
 ];
 
+/**
+ * Env-var-shaped files. Any of these may contain `OPENAI_API_KEY=...`
+ * or a YAML equivalent. GitHub Actions workflow files and docker-compose
+ * files are included alongside the traditional `.env.example` paths so
+ * the single pass catches "we declared OPENAI_API_KEY as a secret in
+ * our CI" as a hidden-AI signal.
+ */
 export const ENV_EXAMPLE_PATHS: readonly string[] = [
   ".env.example",
   ".env.sample",
   ".env.template",
   ".env.dist",
   "env.example",
+  // Common GitHub Actions entry points — wildcard search isn't
+  // available via the REST API, so we check the conventional names.
+  // If a real workflow file lives elsewhere, the /api/sdk/... code-
+  // search pass will still catch env var mentions in it.
+  ".github/workflows/ci.yml",
+  ".github/workflows/ci.yaml",
+  ".github/workflows/test.yml",
+  ".github/workflows/deploy.yml",
+  ".github/workflows/main.yml",
+  ".github/workflows/release.yml",
+  // Docker compose env blocks
+  "docker-compose.yml",
+  "docker-compose.yaml",
+  "compose.yaml",
 ];
 
 /**
