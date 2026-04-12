@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Shield, Play, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Shield, Play, Pencil, Trash2, Loader2, Zap } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -19,6 +19,174 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { Policy } from "@/lib/types/platform";
+
+// --------------------------------------------------------------------------
+// Pre-built policy templates
+// --------------------------------------------------------------------------
+
+interface PolicyTemplate {
+  name: string;
+  description: string;
+  severity: string;
+  conditions: {
+    operator: "AND" | "OR";
+    rules: Array<{ field: string; op: string; value: unknown }>;
+  };
+  actions: Array<{ type: string; config?: Record<string, unknown> }>;
+}
+
+const POLICY_TEMPLATES: PolicyTemplate[] = [
+  {
+    name: "Flag unowned AI systems",
+    description:
+      "Automatically flag any AI system that has no assigned owner, so orphaned assets get immediate visibility.",
+    severity: "high",
+    conditions: {
+      operator: "AND",
+      rules: [{ field: "owner_status", op: "eq", value: "orphaned" }],
+    },
+    actions: [{ type: "mark_flagged" }],
+  },
+  {
+    name: "Alert on critical risk",
+    description:
+      "Send an admin alert whenever an AI system is classified as critical risk, ensuring fast response.",
+    severity: "critical",
+    conditions: {
+      operator: "AND",
+      rules: [{ field: "risk_level", op: "eq", value: "critical" }],
+    },
+    actions: [{ type: "alert_admin" }],
+  },
+  {
+    name: "Require review for production AI",
+    description:
+      "Notify the asset owner when a production AI system has not been reviewed yet.",
+    severity: "medium",
+    conditions: {
+      operator: "AND",
+      rules: [
+        { field: "environment", op: "eq", value: "production" },
+        { field: "review_status", op: "neq", value: "reviewed" },
+      ],
+    },
+    actions: [{ type: "alert_owner" }],
+  },
+  {
+    name: "Flag sensitive data usage",
+    description:
+      "Flag and alert admins when AI systems handle PII or PHI data, supporting compliance oversight.",
+    severity: "high",
+    conditions: {
+      operator: "OR",
+      rules: [
+        { field: "data_classification", op: "contains", value: "pii" },
+        { field: "data_classification", op: "contains", value: "phi" },
+      ],
+    },
+    actions: [{ type: "mark_flagged" }, { type: "alert_admin" }],
+  },
+];
+
+function PolicyTemplateCards({
+  title,
+  onActivated,
+}: {
+  title: string;
+  onActivated: () => void;
+}) {
+  const [activating, setActivating] = useState<string | null>(null);
+
+  async function activate(template: PolicyTemplate) {
+    setActivating(template.name);
+    try {
+      const res = await fetch("/api/policies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: template.name,
+          description: template.description,
+          severity: template.severity,
+          conditions: template.conditions,
+          actions: template.actions,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ?? "Failed to activate policy");
+        return;
+      }
+
+      toast.success(`"${template.name}" activated`);
+      onActivated();
+    } catch {
+      toast.error("Failed to activate policy");
+    } finally {
+      setActivating(null);
+    }
+  }
+
+  const SEVERITY_BADGE: Record<string, string> = {
+    critical:
+      "bg-destructive/10 text-destructive border-destructive/20",
+    high: "bg-warning/10 text-warning border-warning/20",
+    medium: "bg-info/10 text-info border-info/20",
+    low: "bg-success/10 text-success border-success/20",
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Zap className="size-4 text-primary" />
+        <h2 className="text-sm font-semibold">{title}</h2>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {POLICY_TEMPLATES.map((template) => (
+          <div
+            key={template.name}
+            className="rounded-lg border border-border bg-card p-4 space-y-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1 min-w-0">
+                <p className="text-[13px] font-medium leading-tight">
+                  {template.name}
+                </p>
+                <span
+                  className={cn(
+                    "inline-flex h-5 items-center rounded-sm border px-1.5 text-[11px] font-medium capitalize",
+                    SEVERITY_BADGE[template.severity] ?? "border-border text-muted-foreground",
+                  )}
+                >
+                  {template.severity}
+                </span>
+              </div>
+            </div>
+            <p className="text-[12px] text-muted-foreground leading-relaxed">
+              {template.description}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              disabled={activating === template.name}
+              onClick={() => activate(template)}
+            >
+              {activating === template.name ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Activating...
+                </>
+              ) : (
+                "Activate"
+              )}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function timeAgo(date: string) {
   const s = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
@@ -164,23 +332,30 @@ export default function PoliciesPage() {
           ))}
         </div>
       ) : policies.length === 0 ? (
-        <div className="nx-surface">
-          <EmptyState
-            icon={Shield}
-            title="No policies yet"
-            description="Create your first policy to automatically detect orphaned agents, high-risk systems, and compliance gaps across your AI inventory."
-            primaryAction={
-              <Link
-                href="/platform/policies/new"
-                className={buttonVariants({ size: "sm" })}
-              >
-                <Plus className="size-3.5" />
-                Create your first policy
-              </Link>
-            }
+        <div className="space-y-6">
+          <div className="nx-surface">
+            <EmptyState
+              icon={Shield}
+              title="No policies yet"
+              description="Create your first policy to automatically detect orphaned agents, high-risk systems, and compliance gaps across your AI inventory."
+              primaryAction={
+                <Link
+                  href="/platform/policies/new"
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  <Plus className="size-3.5" />
+                  Create custom policy
+                </Link>
+              }
+            />
+          </div>
+          <PolicyTemplateCards
+            title="Recommended governance rules"
+            onActivated={load}
           />
         </div>
       ) : (
+        <>
         <div className="nx-surface overflow-hidden">
           <Table>
             <TableHeader>
@@ -317,6 +492,12 @@ export default function PoliciesPage() {
             </TableBody>
           </Table>
         </div>
+
+        <PolicyTemplateCards
+          title="Add more governance rules"
+          onActivated={load}
+        />
+        </>
       )}
     </div>
   );

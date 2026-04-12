@@ -10,12 +10,22 @@ import {
   Download,
   Plug,
   MoreHorizontal,
+  CheckCircle2,
+  UserPlus,
+  ShieldOff,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskBadge } from "@/components/ui/risk-badge";
 import { FilterBar, FacetDropdown } from "@/components/platform/filter-bar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -187,6 +197,113 @@ function SkeletonRow() {
         </TableCell>
       ))}
     </TableRow>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Row action menu
+// --------------------------------------------------------------------------
+
+function RowActionMenu({
+  asset,
+  onUpdated,
+}: {
+  asset: Asset;
+  onUpdated: () => void;
+}) {
+  const [acting, setActing] = useState(false);
+
+  async function markReviewed() {
+    setActing(true);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_status: "reviewed" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Asset marked as reviewed");
+      onUpdated();
+    } catch {
+      toast.error("Failed to update review status");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function assignOwner() {
+    const email = window.prompt("Enter the new owner's email address:");
+    if (!email?.trim()) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    setActing(true);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/reassign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner_email: email.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success(`Owner set to ${email.trim()}`);
+      onUpdated();
+    } catch {
+      toast.error("Failed to reassign owner");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function quarantineAsset() {
+    if (
+      !window.confirm(
+        "Quarantine this asset? It will be flagged as quarantined and all related policies will be re-evaluated.",
+      )
+    )
+      return;
+    setActing(true);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/quarantine`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Manual quarantine from asset table" }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Asset quarantined");
+      onUpdated();
+    } catch {
+      toast.error("Failed to quarantine asset");
+    } finally {
+      setActing(false);
+    }
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={acting}
+        className="inline-flex items-center justify-center rounded-md size-7 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+        aria-label="Row actions"
+      >
+        <MoreHorizontal className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
+        <DropdownMenuItem onClick={markReviewed}>
+          <CheckCircle2 className="size-4" />
+          Mark reviewed
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={assignOwner}>
+          <UserPlus className="size-4" />
+          Assign owner
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={quarantineAsset}>
+          <ShieldOff className="size-4" />
+          Quarantine
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -546,13 +663,10 @@ export default function AssetsPage() {
                       {formatRelative(asset.last_seen_at)}
                     </TableCell>
                     <TableCell className="pr-3">
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label="Row actions"
-                      >
-                        <MoreHorizontal className="size-3.5" />
-                      </Button>
+                      <RowActionMenu
+                        asset={asset}
+                        onUpdated={fetchAssets}
+                      />
                     </TableCell>
                   </TableRow>
                 );
