@@ -49,6 +49,7 @@ export const GET = withLogging(async () => {
 
   const assetsByKind: Record<string, number> = {};
   const assetsBySource: Record<string, number> = {};
+  const assetsByEnvironment: Record<string, number> = {};
   const assetsByRiskLevel: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0 };
 
   let orphanedAssets = 0;
@@ -60,6 +61,7 @@ export const GET = withLogging(async () => {
     if (a.status !== "active") continue;
     if (a.kind) assetsByKind[a.kind] = (assetsByKind[a.kind] ?? 0) + 1;
     if (a.source) assetsBySource[a.source] = (assetsBySource[a.source] ?? 0) + 1;
+    if (a.environment) assetsByEnvironment[a.environment] = (assetsByEnvironment[a.environment] ?? 0) + 1;
     if (a.risk_level) assetsByRiskLevel[a.risk_level] = (assetsByRiskLevel[a.risk_level] ?? 0) + 1;
     if (a.owner_status === "orphaned") orphanedAssets++;
     if (a.risk_level === "critical") criticalAssets++;
@@ -100,6 +102,12 @@ export const GET = withLogging(async () => {
       connectorCount,
       connectorsByStatus,
       sensitiveDataAssets,
+      assetsByEnvironment,
+      lastSyncAt: connectors.reduce((latest: string | null, c) => {
+        if (!c.last_sync_at) return latest;
+        if (!latest) return c.last_sync_at as string;
+        return (c.last_sync_at as string) > latest ? (c.last_sync_at as string) : latest;
+      }, null),
       recentEvents: eventsRes.data ?? [],
       topRiskAssets: topRiskRes.data ?? [],
       complianceScore,

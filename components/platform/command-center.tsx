@@ -13,6 +13,16 @@ import {
   Eye,
   Lock,
   ExternalLink,
+  ClipboardCheck,
+  Bot,
+  Code,
+  Workflow,
+  Zap,
+  FileCode,
+  Box,
+  Clock,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -40,6 +50,7 @@ interface AnalyticsData {
   totalAssets: number;
   assetsByKind: Record<string, number>;
   assetsBySource: Record<string, number>;
+  assetsByEnvironment: Record<string, number>;
   assetsByRiskLevel: Record<string, number>;
   orphanedAssets: number;
   openViolations: number;
@@ -47,6 +58,7 @@ interface AnalyticsData {
   sensitiveDataAssets: number;
   connectorCount: number;
   connectorsByStatus: Record<string, number>;
+  lastSyncAt: string | null;
   recentEvents: Array<{
     id: string;
     kind: string;
@@ -79,17 +91,17 @@ function formatRelative(iso: string): string {
   return `${months}mo ago`;
 }
 
-const KIND_LABELS: Record<string, string> = {
-  agent: "Agent",
-  pipeline: "Pipeline",
-  workflow: "Workflow",
-  function: "Function",
-  script: "Script",
-  model: "Model",
-  integration: "Integration",
-  api: "API",
-  sdk_reported: "SDK Reported",
-  unknown: "Unknown",
+const KIND_LABELS: Record<string, { label: string; icon: typeof Bot }> = {
+  agent:        { label: "Agents",        icon: Bot },
+  pipeline:     { label: "Pipelines",     icon: Workflow },
+  workflow:     { label: "Workflows",     icon: Workflow },
+  function:     { label: "Functions",     icon: Zap },
+  script:       { label: "Scripts",       icon: FileCode },
+  model:        { label: "Models",        icon: Box },
+  integration:  { label: "Integrations",  icon: Plug },
+  api:          { label: "APIs",          icon: Code },
+  sdk_reported: { label: "SDK Reported",  icon: Code },
+  unknown:      { label: "Other",         icon: Code },
 };
 
 const OWNER_LABELS: Record<string, string> = {
@@ -100,8 +112,16 @@ const OWNER_LABELS: Record<string, string> = {
   reassignment_pending: "Reassigning",
 };
 
+const ENV_ORDER = ["production", "staging", "development", "unknown"] as const;
+const ENV_COLORS: Record<string, string> = {
+  production: "bg-destructive/80",
+  staging: "bg-warning/80",
+  development: "bg-primary/60",
+  unknown: "bg-muted-foreground/40",
+};
+
 // --------------------------------------------------------------------------
-// Phase 1 — Top-level signal cards
+// Signal cards (top-level metrics)
 // --------------------------------------------------------------------------
 
 function SignalCards({ analytics }: { analytics: AnalyticsData }) {
@@ -110,10 +130,7 @@ function SignalCards({ analytics }: { analytics: AnalyticsData }) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Link
-        href="/platform/assets"
-        className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong"
-      >
+      <Link href="/platform/assets" className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <Database className="size-5 text-primary" />
         </div>
@@ -123,14 +140,8 @@ function SignalCards({ analytics }: { analytics: AnalyticsData }) {
         </div>
       </Link>
 
-      <Link
-        href="/platform/assets?owner=orphaned"
-        className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong"
-      >
-        <div className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg",
-          analytics.orphanedAssets > 0 ? "bg-warning/10" : "bg-success/10",
-        )}>
+      <Link href="/platform/assets?owner=orphaned" className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong">
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", analytics.orphanedAssets > 0 ? "bg-warning/10" : "bg-success/10")}>
           <UserX className={cn("size-5", analytics.orphanedAssets > 0 ? "text-warning" : "text-success")} />
         </div>
         <div>
@@ -139,14 +150,8 @@ function SignalCards({ analytics }: { analytics: AnalyticsData }) {
         </div>
       </Link>
 
-      <Link
-        href="/platform/assets?risk=critical,high"
-        className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong"
-      >
-        <div className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg",
-          critHigh > 0 ? "bg-destructive/10" : "bg-success/10",
-        )}>
+      <Link href="/platform/assets?risk=critical,high" className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong">
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", critHigh > 0 ? "bg-destructive/10" : "bg-success/10")}>
           <ShieldAlert className={cn("size-5", critHighTone)} />
         </div>
         <div>
@@ -155,14 +160,8 @@ function SignalCards({ analytics }: { analytics: AnalyticsData }) {
         </div>
       </Link>
 
-      <Link
-        href="/platform/assets"
-        className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong"
-      >
-        <div className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg",
-          analytics.sensitiveDataAssets > 0 ? "bg-warning/10" : "bg-muted",
-        )}>
+      <Link href="/platform/assets" className="nx-surface flex items-center gap-4 p-4 transition-colors hover:border-border-strong">
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", analytics.sensitiveDataAssets > 0 ? "bg-warning/10" : "bg-muted")}>
           <Lock className={cn("size-5", analytics.sensitiveDataAssets > 0 ? "text-warning" : "text-muted-foreground")} />
         </div>
         <div>
@@ -175,79 +174,174 @@ function SignalCards({ analytics }: { analytics: AnalyticsData }) {
 }
 
 // --------------------------------------------------------------------------
-// Phase 2 — "What's happening" panel (recent events in plain English)
+// Status strip — compliance, violations, connectors, last scan
 // --------------------------------------------------------------------------
 
-function WhatsHappening({ events }: { events: AnalyticsData["recentEvents"] }) {
+function StatusStrip({ analytics }: { analytics: AnalyticsData }) {
+  const activeConnectors = analytics.connectorsByStatus["active"] ?? 0;
+  const errorConnectors = analytics.connectorsByStatus["error"] ?? 0;
+
   return (
-    <div className="nx-surface flex flex-col">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h3 className="text-[13px] font-semibold tracking-tight">
-          What&apos;s happening in your AI systems
-        </h3>
-        <Link
-          href="/platform/events"
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          View all →
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {analytics.complianceScore !== null && (
+        <Link href="/platform/compliance" className="nx-surface flex items-center gap-3 p-3 transition-colors hover:border-border-strong">
+          <ClipboardCheck className={cn("size-4 shrink-0", analytics.complianceScore >= 70 ? "text-success" : analytics.complianceScore >= 40 ? "text-warning" : "text-destructive")} />
+          <div className="min-w-0">
+            <p className={cn("text-sm font-bold nx-tabular", analytics.complianceScore >= 70 ? "text-success" : analytics.complianceScore >= 40 ? "text-warning" : "text-destructive")}>
+              {analytics.complianceScore}%
+            </p>
+            <p className="text-[11px] text-muted-foreground">Compliance score</p>
+          </div>
         </Link>
-      </div>
-      {events.length === 0 ? (
-        <div className="px-5 py-10 text-center">
-          <Activity className="mx-auto mb-2 size-5 text-muted-foreground/50" />
-          <p className="text-xs text-muted-foreground">
-            Activity will appear here as sources sync and policies run.
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-border">
-          {events.slice(0, 8).map((event) => {
-            const meta = eventSeverityMeta(event.severity);
-            return (
-              <li key={event.id} className="flex items-start gap-3 px-5 py-3">
-                <span
-                  className={cn("mt-1.5 size-2 rounded-full shrink-0", meta.dotClass)}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-medium text-foreground leading-snug">
-                    {event.title}
-                  </p>
-                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className={cn("capitalize", meta.textClass)}>
-                      {meta.label}
-                    </span>
-                    <span>·</span>
-                    <span className="nx-tabular">
-                      {formatRelative(event.created_at)}
-                    </span>
-                  </div>
-                </div>
-                {event.asset_id && (
-                  <Link
-                    href={`/platform/assets/${event.asset_id}`}
-                    className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"
-                  >
-                    View →
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
       )}
+
+      <Link href="/platform/policies" className="nx-surface flex items-center gap-3 p-3 transition-colors hover:border-border-strong">
+        <ShieldAlert className={cn("size-4 shrink-0", analytics.openViolations > 0 ? "text-warning" : "text-success")} />
+        <div className="min-w-0">
+          <p className="text-sm font-bold nx-tabular">{analytics.openViolations}</p>
+          <p className="text-[11px] text-muted-foreground">Open violations</p>
+        </div>
+      </Link>
+
+      <Link href="/platform/connectors" className="nx-surface flex items-center gap-3 p-3 transition-colors hover:border-border-strong">
+        {errorConnectors > 0 ? (
+          <XCircle className="size-4 shrink-0 text-destructive" />
+        ) : (
+          <CheckCircle2 className="size-4 shrink-0 text-success" />
+        )}
+        <div className="min-w-0">
+          <p className="text-sm font-bold nx-tabular">
+            {activeConnectors} active
+            {errorConnectors > 0 && <span className="text-destructive"> · {errorConnectors} error</span>}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Connected sources</p>
+        </div>
+      </Link>
+
+      <div className="nx-surface flex items-center gap-3 p-3">
+        <Clock className="size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium nx-tabular">
+            {analytics.lastSyncAt ? formatRelative(analytics.lastSyncAt) : "Never"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">Last scan</p>
+        </div>
+      </div>
     </div>
   );
 }
 
 // --------------------------------------------------------------------------
-// Phase 3 — Highest risk systems
+// Ownership coverage
+// --------------------------------------------------------------------------
+
+function OwnershipCoverage({ analytics }: { analytics: AnalyticsData }) {
+  const owned = analytics.totalAssets - analytics.orphanedAssets;
+  const pct = analytics.totalAssets > 0 ? Math.round((owned / analytics.totalAssets) * 100) : 0;
+  const barColor = pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-destructive";
+  const textColor = pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
+
+  return (
+    <Link href="/platform/assets?owner=orphaned" className="nx-surface flex items-center gap-5 p-5 transition-colors hover:border-border-strong">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[13px] font-semibold tracking-tight">AI Ownership Coverage</h3>
+          <span className={cn("text-lg font-bold nx-tabular", textColor)}>{pct}%</span>
+        </div>
+        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
+          <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
+        </div>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          {owned} of {analytics.totalAssets} AI system{analytics.totalAssets === 1 ? "" : "s"} have a clear owner.
+          {analytics.orphanedAssets > 0 && (
+            <span className="font-medium text-foreground"> {analytics.orphanedAssets} need attention.</span>
+          )}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Systems by type — icon grid
+// --------------------------------------------------------------------------
+
+function SystemsByType({ byKind }: { byKind: Record<string, number> }) {
+  const entries = Object.entries(byKind)
+    .map(([kind, count]) => ({ kind, count, ...(KIND_LABELS[kind] ?? KIND_LABELS["unknown"]) }))
+    .sort((a, b) => b.count - a.count);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="nx-surface p-5">
+      <h3 className="text-[13px] font-semibold tracking-tight">Systems by type</h3>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {entries.map(({ kind, count, label, icon: Icon }) => (
+          <Link
+            key={kind}
+            href={`/platform/assets?kind=${kind}`}
+            className="flex items-center gap-3 rounded-md border border-transparent p-2.5 transition-colors hover:border-border hover:bg-muted/40"
+          >
+            <Icon className="size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-semibold nx-tabular leading-none">{count}</p>
+              <p className="text-[11px] text-muted-foreground">{label}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Environment breakdown
+// --------------------------------------------------------------------------
+
+function EnvironmentBreakdown({ byEnv }: { byEnv: Record<string, number> }) {
+  const total = Object.values(byEnv).reduce((s, n) => s + n, 0);
+  if (total === 0) return null;
+
+  return (
+    <div className="nx-surface p-5">
+      <h3 className="text-[13px] font-semibold tracking-tight">Systems by environment</h3>
+      <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-muted">
+        {ENV_ORDER.map((env) => {
+          const count = byEnv[env] ?? 0;
+          const pct = total > 0 ? (count / total) * 100 : 0;
+          if (pct === 0) return null;
+          return (
+            <div
+              key={env}
+              className={cn("h-full", ENV_COLORS[env] ?? "bg-muted-foreground/40")}
+              style={{ width: `${pct}%` }}
+              title={`${env}: ${count}`}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-4">
+        {ENV_ORDER.map((env) => {
+          const count = byEnv[env] ?? 0;
+          if (count === 0) return null;
+          return (
+            <div key={env} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className={cn("size-2 rounded-full", ENV_COLORS[env])} aria-hidden />
+              <span className="capitalize">{env}</span>: <span className="font-semibold nx-tabular">{count}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Highest risk systems
 // --------------------------------------------------------------------------
 
 function HighestRiskSystems({ assets }: { assets: TopRiskAsset[] }) {
-  const risky = assets.filter(
-    (a) => a.risk_level === "critical" || a.risk_level === "high",
-  );
+  const risky = assets.filter((a) => a.risk_level === "critical" || a.risk_level === "high");
   if (risky.length === 0) return null;
 
   return (
@@ -255,56 +349,37 @@ function HighestRiskSystems({ assets }: { assets: TopRiskAsset[] }) {
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <div className="flex items-center gap-2">
           <AlertTriangle className="size-4 text-destructive" />
-          <h3 className="text-[13px] font-semibold tracking-tight">
-            Highest risk systems
-          </h3>
+          <h3 className="text-[13px] font-semibold tracking-tight">Highest risk systems</h3>
         </div>
-        <Link
-          href="/platform/assets?risk=critical,high"
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
+        <Link href="/platform/assets?risk=critical,high" className="text-xs text-muted-foreground hover:text-foreground">
           View all →
         </Link>
       </div>
       <ul className="divide-y divide-border">
         {risky.slice(0, 5).map((asset) => {
           const rv = riskVariant(asset.risk_level);
+          const kindMeta = KIND_LABELS[asset.kind] ?? KIND_LABELS["unknown"];
           return (
             <li key={asset.id} className="flex items-center gap-4 px-5 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <Link
-                    href={`/platform/assets/${asset.id}`}
-                    className="text-[13px] font-semibold text-foreground hover:text-primary truncate"
-                  >
+                  <Link href={`/platform/assets/${asset.id}`} className="text-[13px] font-semibold text-foreground hover:text-primary truncate">
                     {asset.name}
                   </Link>
-                  <span className={cn(
-                    "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium border",
-                    rv.badgeClass ?? `${rv.dotClass.replace("bg-", "border-")}/20 ${rv.dotClass.replace("bg-", "bg-")}/10 ${rv.textClass}`,
-                  )}>
+                  <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium border", rv.badgeClass ?? `border-current/20 ${rv.textClass}`)}>
                     {rv.label}
                   </span>
                 </div>
                 <p className="mt-0.5 text-[12px] text-muted-foreground truncate">
-                  {asset.description
-                    ? asset.description.slice(0, 120)
-                    : `${KIND_LABELS[asset.kind] ?? asset.kind} · ${asset.source} · ${asset.environment}`
-                  }
+                  {kindMeta.label} · {asset.source} · {asset.environment}
+                  {asset.owner_status === "orphaned" && " · No owner"}
                 </p>
               </div>
-              <div className="hidden sm:flex flex-col items-end gap-0.5 shrink-0">
-                <span className="text-[11px] text-muted-foreground">
-                  {OWNER_LABELS[asset.owner_status] ?? asset.owner_status}
-                </span>
-                <span className="text-[11px] nx-tabular text-muted-foreground">
-                  Score: {asset.risk_score}
-                </span>
+              <div className="hidden sm:block shrink-0 text-right">
+                <span className={cn("text-sm font-bold nx-tabular", rv.textClass)}>{asset.risk_score}</span>
+                <p className="text-[11px] text-muted-foreground">risk score</p>
               </div>
-              <Link
-                href={`/platform/assets/${asset.id}`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href={`/platform/assets/${asset.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 <Eye className="size-3.5" />
                 Review
               </Link>
@@ -317,7 +392,7 @@ function HighestRiskSystems({ assets }: { assets: TopRiskAsset[] }) {
 }
 
 // --------------------------------------------------------------------------
-// Risk distribution bar
+// Risk distribution
 // --------------------------------------------------------------------------
 
 function RiskBar({ byLevel }: { byLevel: Record<string, number> }) {
@@ -327,9 +402,7 @@ function RiskBar({ byLevel }: { byLevel: Record<string, number> }) {
 
   return (
     <div className="nx-surface p-5">
-      <h3 className="text-[13px] font-semibold tracking-tight mb-4">
-        Risk distribution
-      </h3>
+      <h3 className="text-[13px] font-semibold tracking-tight mb-4">Risk distribution</h3>
       <div className="flex h-3 overflow-hidden rounded-full bg-muted">
         {levels.map((level) => {
           const count = byLevel[level] ?? 0;
@@ -337,13 +410,7 @@ function RiskBar({ byLevel }: { byLevel: Record<string, number> }) {
           if (pct === 0) return null;
           const variant = riskVariant(level);
           return (
-            <Link
-              key={level}
-              href={`/platform/assets?risk=${level}`}
-              className={cn("h-full transition-opacity hover:opacity-80", variant.dotClass)}
-              style={{ width: `${pct}%` }}
-              title={`${variant.label}: ${count} (${Math.round(pct)}%)`}
-            />
+            <Link key={level} href={`/platform/assets?risk=${level}`} className={cn("h-full transition-opacity hover:opacity-80", variant.dotClass)} style={{ width: `${pct}%` }} title={`${variant.label}: ${count}`} />
           );
         })}
       </div>
@@ -352,11 +419,7 @@ function RiskBar({ byLevel }: { byLevel: Record<string, number> }) {
           const count = byLevel[level] ?? 0;
           const variant = riskVariant(level);
           return (
-            <Link
-              key={level}
-              href={`/platform/assets?risk=${level}`}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-            >
+            <Link key={level} href={`/platform/assets?risk=${level}`} className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
               <span className={cn("size-2 rounded-full", variant.dotClass)} aria-hidden />
               {variant.label}: <span className="font-semibold nx-tabular">{count}</span>
             </Link>
@@ -368,116 +431,50 @@ function RiskBar({ byLevel }: { byLevel: Record<string, number> }) {
 }
 
 // --------------------------------------------------------------------------
-// Insights — actionable recommendations
+// What's happening — event feed
 // --------------------------------------------------------------------------
 
-interface Insight {
-  severity: "critical" | "warning" | "info" | "success";
-  title: string;
-  description: string;
-  href: string;
-  action: string;
-}
-
-function generateInsights(analytics: AnalyticsData): Insight[] {
-  const insights: Insight[] = [];
-  const critical = analytics.assetsByRiskLevel["critical"] ?? 0;
-  const high = analytics.assetsByRiskLevel["high"] ?? 0;
-
-  if (critical > 0) {
-    insights.push({
-      severity: "critical",
-      title: `${critical} critical-risk system${critical === 1 ? "" : "s"} need review`,
-      description: "Highest governance risk — unmonitored, unowned, or using sensitive data.",
-      href: "/platform/assets?risk=critical",
-      action: "Review now",
-    });
-  }
-  if (analytics.orphanedAssets > 0) {
-    insights.push({
-      severity: "warning",
-      title: `${analytics.orphanedAssets} system${analytics.orphanedAssets === 1 ? "" : "s"} with no owner`,
-      description: "Assign an owner so someone is accountable for these AI systems.",
-      href: "/platform/assets?owner=orphaned",
-      action: "Assign owners",
-    });
-  }
-  if (analytics.openViolations > 0) {
-    insights.push({
-      severity: "warning",
-      title: `${analytics.openViolations} open policy violation${analytics.openViolations === 1 ? "" : "s"}`,
-      description: "These systems breach your governance policies.",
-      href: "/platform/policies",
-      action: "View violations",
-    });
-  }
-  if (high > 0 && critical === 0) {
-    insights.push({
-      severity: "warning",
-      title: `${high} high-risk system${high === 1 ? "" : "s"} detected`,
-      description: "Review these for proper governance and ownership.",
-      href: "/platform/assets?risk=high",
-      action: "Review",
-    });
-  }
-  if (analytics.connectorCount === 1) {
-    insights.push({
-      severity: "info",
-      title: "Only 1 source connected",
-      description: "Connect more sources to expand visibility across your org.",
-      href: "/platform/connectors",
-      action: "Add source",
-    });
-  }
-  if (insights.length === 0) {
-    insights.push({
-      severity: "success",
-      title: "No urgent issues",
-      description: "All systems are owned, no violations, and risk is under control.",
-      href: "/platform/assets",
-      action: "View systems",
-    });
-  }
-  return insights.slice(0, 4);
-}
-
-const insightStyles = {
-  critical: { border: "border-destructive/30", bg: "bg-destructive/5", dot: "bg-destructive", text: "text-destructive" },
-  warning:  { border: "border-warning/30",     bg: "bg-warning/5",     dot: "bg-warning",     text: "text-warning"     },
-  info:     { border: "border-primary/30",      bg: "bg-primary/5",     dot: "bg-primary",     text: "text-primary"     },
-  success:  { border: "border-success/30",      bg: "bg-success/5",     dot: "bg-success",     text: "text-success"     },
-} as const;
-
-function InsightsPanel({ analytics }: { analytics: AnalyticsData }) {
-  const insights = generateInsights(analytics);
+function WhatsHappening({ events }: { events: AnalyticsData["recentEvents"] }) {
   return (
-    <div className="space-y-3">
-      <h3 className="text-[13px] font-semibold tracking-tight">What you should do next</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {insights.map((insight, i) => {
-          const s = insightStyles[insight.severity];
-          return (
-            <Link
-              key={i}
-              href={insight.href}
-              className={cn("nx-surface flex flex-col gap-2 p-4 transition-colors hover:border-border-strong", s.border, s.bg)}
-            >
-              <div className="flex items-center gap-2">
-                <span className={cn("size-2 rounded-full shrink-0", s.dot)} />
-                <span className="text-[13px] font-semibold text-foreground leading-snug">{insight.title}</span>
-              </div>
-              <p className="text-[12px] leading-relaxed text-muted-foreground">{insight.description}</p>
-              <span className={cn("text-[12px] font-medium mt-auto", s.text)}>{insight.action} →</span>
-            </Link>
-          );
-        })}
+    <div className="nx-surface flex flex-col">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <h3 className="text-[13px] font-semibold tracking-tight">What&apos;s happening</h3>
+        <Link href="/platform/events" className="text-xs text-muted-foreground hover:text-foreground">View all →</Link>
       </div>
+      {events.length === 0 ? (
+        <div className="px-5 py-10 text-center">
+          <Activity className="mx-auto mb-2 size-5 text-muted-foreground/50" />
+          <p className="text-xs text-muted-foreground">Activity will appear here as sources sync and policies run.</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {events.slice(0, 6).map((event) => {
+            const meta = eventSeverityMeta(event.severity);
+            return (
+              <li key={event.id} className="flex items-start gap-3 px-5 py-3">
+                <span className={cn("mt-1.5 size-2 rounded-full shrink-0", meta.dotClass)} aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-foreground leading-snug">{event.title}</p>
+                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <span className={cn("capitalize", meta.textClass)}>{meta.label}</span>
+                    <span>·</span>
+                    <span className="nx-tabular">{formatRelative(event.created_at)}</span>
+                  </div>
+                </div>
+                {event.asset_id && (
+                  <Link href={`/platform/assets/${event.asset_id}`} className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground">View →</Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
 // --------------------------------------------------------------------------
-// Source breakdown — compact
+// Source breakdown
 // --------------------------------------------------------------------------
 
 function SourceBreakdown({ bySource }: { bySource: Record<string, number> }) {
@@ -509,7 +506,76 @@ function SourceBreakdown({ bySource }: { bySource: Record<string, number> }) {
 }
 
 // --------------------------------------------------------------------------
-// Phase 5 — Empty state (no connectors)
+// Insights — actionable recommendations
+// --------------------------------------------------------------------------
+
+interface Insight {
+  severity: "critical" | "warning" | "info" | "success";
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}
+
+function generateInsights(analytics: AnalyticsData): Insight[] {
+  const insights: Insight[] = [];
+  const critical = analytics.assetsByRiskLevel["critical"] ?? 0;
+  const high = analytics.assetsByRiskLevel["high"] ?? 0;
+
+  if (critical > 0) {
+    insights.push({ severity: "critical", title: `${critical} critical-risk system${critical === 1 ? "" : "s"} need review`, description: "Highest governance risk — unmonitored, unowned, or using sensitive data.", href: "/platform/assets?risk=critical", action: "Review now" });
+  }
+  if (analytics.orphanedAssets > 0) {
+    insights.push({ severity: "warning", title: `${analytics.orphanedAssets} system${analytics.orphanedAssets === 1 ? "" : "s"} with no owner`, description: "Assign an owner so someone is accountable.", href: "/platform/assets?owner=orphaned", action: "Assign owners" });
+  }
+  if (analytics.openViolations > 0) {
+    insights.push({ severity: "warning", title: `${analytics.openViolations} open policy violation${analytics.openViolations === 1 ? "" : "s"}`, description: "These systems breach your governance policies.", href: "/platform/policies", action: "View violations" });
+  }
+  if (high > 0 && critical === 0) {
+    insights.push({ severity: "warning", title: `${high} high-risk system${high === 1 ? "" : "s"} detected`, description: "Review for proper governance and ownership.", href: "/platform/assets?risk=high", action: "Review" });
+  }
+  if (analytics.connectorCount === 1) {
+    insights.push({ severity: "info", title: "Only 1 source connected", description: "Connect more sources to expand visibility.", href: "/platform/connectors", action: "Add source" });
+  }
+  if (insights.length === 0) {
+    insights.push({ severity: "success", title: "No urgent issues", description: "All systems owned, no violations, risk under control.", href: "/platform/assets", action: "View systems" });
+  }
+  return insights.slice(0, 4);
+}
+
+const insightStyles = {
+  critical: { border: "border-destructive/30", bg: "bg-destructive/5", dot: "bg-destructive", text: "text-destructive" },
+  warning:  { border: "border-warning/30", bg: "bg-warning/5", dot: "bg-warning", text: "text-warning" },
+  info:     { border: "border-primary/30", bg: "bg-primary/5", dot: "bg-primary", text: "text-primary" },
+  success:  { border: "border-success/30", bg: "bg-success/5", dot: "bg-success", text: "text-success" },
+} as const;
+
+function InsightsPanel({ analytics }: { analytics: AnalyticsData }) {
+  const insights = generateInsights(analytics);
+  return (
+    <div className="space-y-3">
+      <h3 className="text-[13px] font-semibold tracking-tight">What you should do next</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {insights.map((insight, i) => {
+          const s = insightStyles[insight.severity];
+          return (
+            <Link key={i} href={insight.href} className={cn("nx-surface flex flex-col gap-2 p-4 transition-colors hover:border-border-strong", s.border, s.bg)}>
+              <div className="flex items-center gap-2">
+                <span className={cn("size-2 rounded-full shrink-0", s.dot)} />
+                <span className="text-[13px] font-semibold text-foreground leading-snug">{insight.title}</span>
+              </div>
+              <p className="text-[12px] leading-relaxed text-muted-foreground">{insight.description}</p>
+              <span className={cn("text-[12px] font-medium mt-auto", s.text)}>{insight.action} →</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Empty state
 // --------------------------------------------------------------------------
 
 function EmptyDashboard() {
@@ -517,26 +583,18 @@ function EmptyDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">AI Control Plane</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect a source to start discovering AI systems across your organization.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Connect a source to start discovering AI systems across your organization.</p>
       </div>
-
       <div className="nx-surface flex flex-col items-center gap-4 px-6 py-16 text-center">
         <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-muted/40">
           <Plug className="size-6 text-muted-foreground/70" aria-hidden />
         </div>
-        <h2 className="text-xl font-semibold tracking-tight">
-          Connect your first source
-        </h2>
+        <h2 className="text-xl font-semibold tracking-tight">Connect your first source</h2>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-          Link GitHub, GitLab, AWS, or an automation platform. Spekris will
-          automatically scan for AI agents, LLM integrations, and ML workflows,
-          then score risk and surface what needs attention.
+          Link GitHub, GitLab, AWS, or an automation platform. Spekris will automatically scan for AI agents, LLM integrations, and ML workflows, then score risk and surface what needs attention.
         </p>
         <Link href="/platform/connectors" className={buttonVariants({ size: "lg" })}>
-          Add connector
-          <ArrowRight className="size-4" />
+          Add connector <ArrowRight className="size-4" />
         </Link>
       </div>
     </div>
@@ -544,7 +602,7 @@ function EmptyDashboard() {
 }
 
 // --------------------------------------------------------------------------
-// Phase 5 — Clean scan (connectors but zero assets)
+// Clean scan
 // --------------------------------------------------------------------------
 
 function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
@@ -556,18 +614,14 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
           Monitoring {analytics.connectorCount} connected source{analytics.connectorCount === 1 ? "" : "s"}.
         </p>
       </div>
-
       <div className="nx-surface flex flex-col items-center gap-5 px-6 py-14 text-center">
         <div className="flex size-14 items-center justify-center rounded-full border border-success/20 bg-success/10">
           <ShieldCheck className="size-7 text-success" aria-hidden />
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">
-            You&apos;re in control — no risky AI systems detected
-          </h2>
+          <h2 className="text-xl font-semibold tracking-tight">You&apos;re in control — no risky AI systems detected</h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            Spekris scanned your connected sources and found no operational AI systems
-            that need governance attention. This is a positive result.
+            Spekris scanned your connected sources and found no operational AI systems that need governance attention.
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 text-[12px] text-muted-foreground">
@@ -575,54 +629,16 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
           <span>Connect more sources to expand coverage.</span>
         </div>
         <Link href="/platform/connectors" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Manage sources
-          <ArrowRight className="size-3.5" />
+          Manage sources <ArrowRight className="size-3.5" />
         </Link>
       </div>
-
-      {analytics.recentEvents.length > 0 && (
-        <WhatsHappening events={analytics.recentEvents} />
-      )}
+      {analytics.recentEvents.length > 0 && <WhatsHappening events={analytics.recentEvents} />}
     </div>
   );
 }
 
 // --------------------------------------------------------------------------
-// Ownership Coverage metric
-// --------------------------------------------------------------------------
-
-function OwnershipCoverage({ analytics }: { analytics: AnalyticsData }) {
-  const owned = analytics.totalAssets - analytics.orphanedAssets;
-  const pct = analytics.totalAssets > 0 ? Math.round((owned / analytics.totalAssets) * 100) : 0;
-  const barColor = pct >= 80 ? "bg-success" : pct >= 50 ? "bg-warning" : "bg-destructive";
-  const textColor = pct >= 80 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
-
-  return (
-    <Link
-      href="/platform/assets?owner=orphaned"
-      className="nx-surface flex items-center gap-5 p-5 transition-colors hover:border-border-strong"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[13px] font-semibold tracking-tight">AI Ownership Coverage</h3>
-          <span className={cn("text-lg font-bold nx-tabular", textColor)}>{pct}%</span>
-        </div>
-        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
-          <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${pct}%` }} />
-        </div>
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          {owned} of {analytics.totalAssets} AI system{analytics.totalAssets === 1 ? "" : "s"} have a clear owner.
-          {analytics.orphanedAssets > 0 && (
-            <span className="font-medium text-foreground"> {analytics.orphanedAssets} need attention.</span>
-          )}
-        </p>
-      </div>
-    </Link>
-  );
-}
-
-// --------------------------------------------------------------------------
-// Main dashboard — the control plane
+// Main dashboard
 // --------------------------------------------------------------------------
 
 export function CommandCenterDashboard({
@@ -644,31 +660,36 @@ export function CommandCenterDashboard({
             across {analytics.connectorCount} source{analytics.connectorCount === 1 ? "" : "s"}.
           </p>
         </div>
-        <Link
-          href="/platform/assets"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <ExternalLink className="size-3.5" />
-          Full registry
+        <Link href="/platform/assets" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <ExternalLink className="size-3.5" /> Full registry
         </Link>
       </div>
 
-      {/* Phase 1 — Signal cards */}
+      {/* Signal cards */}
       <SignalCards analytics={analytics} />
+
+      {/* Status strip — compliance, violations, connectors, last scan */}
+      <StatusStrip analytics={analytics} />
 
       {/* Ownership coverage */}
       <OwnershipCoverage analytics={analytics} />
 
-      {/* Phase 3 — Highest risk systems */}
+      {/* Highest risk systems */}
       <HighestRiskSystems assets={analytics.topRiskAssets} />
 
-      {/* Phase 8 — What you should do next */}
+      {/* What you should do next */}
       <InsightsPanel analytics={analytics} />
 
-      {/* Risk bar */}
+      {/* Systems by type + environment */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SystemsByType byKind={analytics.assetsByKind} />
+        <EnvironmentBreakdown byEnv={analytics.assetsByEnvironment} />
+      </div>
+
+      {/* Risk distribution */}
       <RiskBar byLevel={analytics.assetsByRiskLevel} />
 
-      {/* Phase 2 — What's happening + source breakdown */}
+      {/* Activity + source breakdown */}
       <div className="grid gap-4 lg:grid-cols-2">
         <WhatsHappening events={analytics.recentEvents} />
         <SourceBreakdown bySource={analytics.assetsBySource} />
