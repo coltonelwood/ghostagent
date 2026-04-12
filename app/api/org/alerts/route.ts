@@ -50,7 +50,14 @@ export const GET = withLogging(async () => {
     return NextResponse.json({ error: "Failed to fetch alert preferences" }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data ?? { ...DEFAULTS, org_id: org.id } });
+  const prefs = data ?? { ...DEFAULTS, org_id: org.id };
+  // UI expects event_filter_matrix, DB stores event_filters — return both
+  return NextResponse.json({
+    data: {
+      ...prefs,
+      event_filter_matrix: prefs.event_filters ?? {},
+    },
+  });
 });
 
 export const PATCH = withLogging(async (req: NextRequest) => {

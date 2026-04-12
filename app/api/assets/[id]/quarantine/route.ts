@@ -43,6 +43,12 @@ const handler = withLogging(
         );
       }
 
+      let reason = "Manual quarantine";
+      try {
+        const body = await req.json();
+        if (body?.reason) reason = String(body.reason);
+      } catch { /* empty body is fine */ }
+
       const now = new Date().toISOString();
 
       // Update asset status
@@ -96,8 +102,10 @@ const handler = withLogging(
         kind: "asset_quarantined",
         severity: "high",
         title: `Asset quarantined: ${asset.name}`,
+        body: reason,
         metadata: {
           previousStatus: asset.status,
+          reason,
           connectorQuarantine: connectorResult,
         },
         assetId: id,

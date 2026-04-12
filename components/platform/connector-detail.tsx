@@ -206,7 +206,7 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -217,6 +217,28 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
               className={`size-4 ${inFlight ? "animate-spin" : ""}`}
             />
             {inFlight ? "Syncing..." : "Sync Now"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const newStatus = connector.status === "paused" ? "active" : "paused";
+              try {
+                const res = await fetch(`/api/connectors/${connector.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ status: newStatus }),
+                });
+                if (!res.ok) throw new Error();
+                toast.success(newStatus === "paused" ? "Connector paused" : "Connector resumed");
+                window.location.reload();
+              } catch {
+                toast.error("Failed to update connector status");
+              }
+            }}
+          >
+            <Settings className="size-4" />
+            {connector.status === "paused" ? "Resume" : "Pause"}
           </Button>
           <Dialog>
             <DialogTrigger
