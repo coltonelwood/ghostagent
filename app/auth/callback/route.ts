@@ -2,10 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 
+/**
+ * Accept only same-origin relative paths so a crafted
+ *   /auth/callback?next=https://evil.com
+ * can't turn a successful sign-in into an off-site redirect.
+ *
+ *   - Must start with a single "/"
+ *   - Must not start with "//" (protocol-relative URL)
+ *   - Must not start with "/\\" (some browsers accept backslash as path sep)
+ *   - Max 200 chars so nothing weird leaks into logs
+ */
+function safeNextPath(value: string | null): string | null {
+  if (!value) return null;
+  if (value.length > 200) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
+  // Reject anything that could be interpreted as a URL.
+  if (/^\/\w+:/.test(value)) return null;
+  return value;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next");
+  const next = safeNextPath(searchParams.get("next"));
 
   if (!code) {
     return NextResponse.redirect(new URL("/auth/login?error=no_code", req.url));
@@ -76,12 +96,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Route: new users go to onboarding, returning users to platform
+  // Route: new users go to onboarding, returning users to platform.
+  // `next` has already been validated as a same-origin relative path by
+  // safeNextPath() above.
   const redirectTo = next
     ? new URL(next, req.url)
     : isNewUser
-    ? new URL("/onboarding", req.url)
-    : new URL("/platform", req.url);
+      ? new URL("/onboarding", req.url)
+      : new URL("/platform", req.url);
 
   return NextResponse.redirect(redirectTo);
 }

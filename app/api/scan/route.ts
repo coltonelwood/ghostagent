@@ -103,8 +103,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit: 5 scans per hour per user
-  const rateCheck = scanRateLimiter.check(user.id);
+  // Rate limit: 5 scans per hour per user. Uses Upstash when configured
+  // so the limit holds across all Vercel instances; falls back to the
+  // in-memory sliding window if Redis is unreachable.
+  const rateCheck = await scanRateLimiter.checkAsync(user.id);
   if (!rateCheck.allowed) {
     apiLogger.warn({ userId: user.id }, "scan rate limit exceeded");
     return NextResponse.json(

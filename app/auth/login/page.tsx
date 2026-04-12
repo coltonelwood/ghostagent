@@ -1,37 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+/**
+ * Allow only same-origin relative paths in the post-login redirect so a
+ * crafted /auth/login?redirectTo=https://evil.com can't phish users.
+ * Mirrors safeNextPath() in /app/auth/callback/route.ts.
+ */
+function safeRedirectPath(value: string | null): string | null {
+  if (!value) return null;
+  if (value.length > 200) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
+  if (/^\/\w+:/.test(value)) return null;
+  return value;
+}
+
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const rawRedirectTo = searchParams.get("redirectTo");
+  const safeRedirect = safeRedirectPath(rawRedirectTo);
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  // Redirect already-authenticated users to the platform
+  // Redirect already-authenticated users to their intended destination
+  // (or /platform) — same safe-path check prevents off-site jumps.
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/platform");
+      if (data.session) router.replace(safeRedirect ?? "/platform");
     });
-  }, [router]);
+  }, [router, safeRedirect]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     const supabase = createClient();
+    // Pass the validated path into the magic-link callback so we land
+    // back where we started after the auth round trip.
+    const callback = new URL("/auth/callback", window.location.origin);
+    if (safeRedirect) callback.searchParams.set("next", safeRedirect);
     const { error: authError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: callback.toString(),
       },
     });
     setLoading(false);
@@ -172,5 +195,19 @@ export default function LoginPage() {
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }

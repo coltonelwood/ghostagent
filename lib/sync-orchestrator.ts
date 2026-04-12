@@ -5,8 +5,16 @@ import { scoreAsset, buildRiskContext } from "./risk-engine";
 import { resolveOwnership, shouldMarkOrphaned } from "./ownership-engine";
 import { runPoliciesForOrg } from "./policy-engine";
 import { emitEvent } from "./event-system";
+import { getPlanLimits } from "./entitlements";
+import { getOrgAssetCount } from "./org";
 import { logger } from "./logger";
-import type { Asset, Connector, HREmployee, NormalizedAsset } from "./types/platform";
+import type {
+  Asset,
+  Connector,
+  HREmployee,
+  NormalizedAsset,
+  Organization,
+} from "./types/platform";
 
 /**
  * Hard ceiling on assets persisted per single sync. Protects the DB, the
@@ -58,6 +66,61 @@ export async function syncConnector(connectorId: string): Promise<{success:boole
         { connectorId, total: syncResult.assets.length, kept: MAX_ASSETS_PER_SYNC, truncated },
         "sync: asset count exceeded ceiling — truncating",
       );
+    }
+
+    // Plan entitlement: stop persisting before we blow past the org's
+    // asset cap. Without this, a starter on a 50-asset plan could end
+    // up with 2,000 rows from a single sync and the billing UI would
+    // read 50/50 while the DB holds 2,000. Enterprise is uncapped.
+    const { data: orgRow } = await adminClient
+      .from("organizations")
+      .select("*")
+      .eq("id", connector.org_id)
+      .single();
+    const org = orgRow as unknown as Organization | null;
+    if (org) {
+      const limits = getPlanLimits(org);
+      if (limits.maxAssets !== -1) {
+        const currentCount = await getOrgAssetCount(org.id);
+        const headroom = Math.max(0, limits.maxAssets - currentCount);
+        if (headroom === 0) {
+          logger.warn(
+            { connectorId, orgId: org.id, plan: org.plan, limit: limits.maxAssets },
+            "sync: asset plan limit reached — skipping all new assets",
+          );
+          // Surface on the connector so the operator sees why syncing
+          // isn't producing new rows.
+          await emitEvent({
+            orgId: org.id,
+            kind: "connector_sync_completed",
+            severity: "high",
+            title: `${connector.name} sync skipped — plan limit reached`,
+            body: `Your ${org.plan} plan allows a maximum of ${limits.maxAssets} assets. Upgrade to import more.`,
+            connectorId,
+            metadata: {
+              assetsFound: syncResult.assets.length,
+              planLimit: limits.maxAssets,
+              currentCount,
+            },
+          });
+          assets = [];
+        } else if (assets.length > headroom) {
+          const skipped = assets.length - headroom;
+          assets = assets.slice(0, headroom);
+          truncated += skipped;
+          logger.warn(
+            {
+              connectorId,
+              orgId: org.id,
+              plan: org.plan,
+              limit: limits.maxAssets,
+              headroom,
+              skipped,
+            },
+            "sync: asset plan limit reached — truncating to fit",
+          );
+        }
+      }
     }
 
     const newIds: string[] = [];
