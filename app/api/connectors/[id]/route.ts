@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withLogging } from "@/lib/api-handler";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { requireAuth, requireRole, AuthError } from "@/lib/org-auth";
-import { encrypt } from "@/lib/crypto";
+import { encryptCredentials } from "@/lib/crypto";
 import { getConnector } from "@/lib/connectors";
 import { auditLog } from "@/lib/audit";
 import { apiRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
@@ -78,13 +78,13 @@ export const PATCH = withLogging(
         name?: string;
         credentials?: Record<string, string>;
         config?: Record<string, unknown>;
-        enabled?: boolean;
+        status?: "active" | "paused";
       };
 
       const updates: Record<string, unknown> = {};
       if (body.name !== undefined) updates.name = body.name;
       if (body.config !== undefined) updates.config = body.config;
-      if (body.enabled !== undefined) updates.enabled = body.enabled;
+      if (body.status !== undefined) updates.status = body.status;
 
       if (body.credentials) {
         const impl = getConnector(connector.kind as never);
@@ -95,10 +95,7 @@ export const PATCH = withLogging(
             { status: 422 },
           );
         }
-        updates.credentials_encrypted = encrypt(
-          JSON.stringify(body.credentials),
-        );
-        updates.status = "active";
+        updates.credentials_encrypted = encryptCredentials(body.credentials);
       }
 
       const db = getAdminClient();
