@@ -295,3 +295,151 @@ export const FLAG_FILE_PATHS = [
 
 // AI flag name patterns (regex applied to flag names in JSON)
 export const AI_FLAG_NAME_PATTERN = /\b(ai|ml|llm|model|predict|suggest|automat|gpt|claude|embed)\b/i;
+
+// ─── DETECTION CLASS → COMPLIANCE FRAMEWORK MAPPING ──────────────────────
+// Deterministic mapping from detection class to the compliance frameworks
+// most likely to be affected. Used as a floor so findings always carry
+// at least one framework tag — independent of the LLM classifier.
+export const CLASS_COMPLIANCE_MAP: Record<DetectionClass, string[]> = {
+  LLM_INTEGRATION:    ["SOC2", "EU_AI_ACT"],
+  ML_SERVICE:         ["SOC2", "EU_AI_ACT", "ISO42001"],
+  ML_MODEL:           ["SOC2", "EU_AI_ACT", "ISO42001"],
+  CLINICAL_AI:        ["HIPAA", "SOC2", "EU_AI_ACT"],
+  AI_FEATURE_FLAG:    ["SOC2"],
+  DOCUMENT_AI:        ["SOC2", "EU_AI_ACT"],
+  AUTOMATION_AGENT:   ["SOC2", "EU_AI_ACT"],
+  SECURITY_RISK:      ["SOC2", "HIPAA"],
+  DATA_EXPOSURE:      ["HIPAA", "SOC2"],
+  MODEL_INTEGRITY:    ["SOC2", "EU_AI_ACT", "ISO42001"],
+};
+
+/**
+ * Compliance frameworks for a finding, combining:
+ *   - the finding's detection class (deterministic floor)
+ *   - any PHI signal (forces HIPAA)
+ *   - whatever the LLM classifier added (optional, deduped)
+ */
+export function resolveComplianceTags(
+  detectionClass: DetectionClass,
+  phiContext: boolean,
+  llmTags: string[] = [],
+): string[] {
+  const tags = new Set<string>(CLASS_COMPLIANCE_MAP[detectionClass] ?? []);
+  if (phiContext) tags.add("HIPAA");
+  // Only keep LLM-suggested tags that are in the known set.
+  const allowed = new Set(["HIPAA", "SOC2", "EU_AI_ACT", "ISO42001"]);
+  for (const raw of llmTags) {
+    const upper = String(raw).toUpperCase().replace(/\s+/g, "_");
+    if (allowed.has(upper)) tags.add(upper);
+  }
+  // Deterministic order: HIPAA → SOC2 → EU_AI_ACT → ISO42001
+  const order = ["HIPAA", "SOC2", "EU_AI_ACT", "ISO42001"];
+  return order.filter((t) => tags.has(t));
+}
+
+// ─── CURATED FALLBACK REASON TEMPLATES ───────────────────────────────────
+// Used when the LLM classifier is unavailable. These must sound every bit
+// as professional as the GPT-produced text so a prospect can't tell which
+// path was taken. Each template composes from the escalation reasons we
+// already computed — it is never just "AI system detected".
+interface FallbackTemplate {
+  riskReason: string;
+  whyFlagged: string;
+}
+
+const FALLBACK_TEMPLATES: Record<DetectionClass, FallbackTemplate> = {
+  LLM_INTEGRATION: {
+    riskReason:
+      "LLM API integration found in {repo}/{file}. Verify whether sensitive data is being sent to the provider, and confirm model and temperature are documented.",
+    whyFlagged:
+      "An external LLM provider is being called from this file. Without a documented data-handling policy, it is difficult to confirm what information leaves your environment on every request.",
+  },
+  ML_SERVICE: {
+    riskReason:
+      "Custom ML inference service {name} detected in {repo}/{file}. Model card, accuracy baseline, and owner should be on file before this reaches production.",
+    whyFlagged:
+      "A homegrown ML service is making predictions inside your stack. If the model drifts or its training data becomes stale, there is no mechanism here to detect it.",
+  },
+  ML_MODEL: {
+    riskReason:
+      "ML model code in {repo}/{file}. Confirm training data provenance, version, and accuracy threshold are captured in the model card.",
+    whyFlagged:
+      "A model training or serving pipeline was found. Missing version, baseline, or owner metadata makes it hard to roll back if predictions degrade.",
+  },
+  CLINICAL_AI: {
+    riskReason:
+      "Clinical AI system {name} operating on patient-adjacent data in {repo}/{file}. Requires named owner, accuracy baseline, and documented human-review gate.",
+    whyFlagged:
+      "A clinical AI model is running against patient-related data. A missing owner, BAA, or oversight process here is a HIPAA and patient-safety concern.",
+  },
+  AI_FEATURE_FLAG: {
+    riskReason:
+      "AI feature flag {name} in {repo}/{file}. Record rollout plan, success criteria, and rollback owner before expanding further.",
+    whyFlagged:
+      "An AI-powered feature is gated behind a flag. Without a documented rollout plan and owner, it is easy for this to sit partially-enabled for months.",
+  },
+  DOCUMENT_AI: {
+    riskReason:
+      "Document-AI pipeline {name} in {repo}/{file}. Confirm extracted data is reviewed and that downstream systems handle low-confidence outputs safely.",
+    whyFlagged:
+      "An OCR/document-extraction pipeline was found. If downstream systems trust these outputs without a confidence threshold, errors propagate silently.",
+  },
+  AUTOMATION_AGENT: {
+    riskReason:
+      "Autonomous automation agent {name} in {repo}/{file}. Confirm a human review step or kill-switch exists before this runs in production.",
+    whyFlagged:
+      "An automated agent is taking actions without a documented review step. If the agent makes wrong calls at scale, there is no obvious circuit breaker.",
+  },
+  SECURITY_RISK: {
+    riskReason:
+      "Security gap detected in {repo}/{file}. Review access controls, secrets handling, and audit-log coverage before broader rollout.",
+    whyFlagged:
+      "A security weakness was found in or adjacent to an AI system. Even one of these is worth paging an engineer before the next release.",
+  },
+  DATA_EXPOSURE: {
+    riskReason:
+      "PHI/PII signals detected in AI pipeline at {repo}/{file}. Confirm a Business Associate Agreement is in place and that the provider is contractually allowed.",
+    whyFlagged:
+      "Sensitive personal or health data is flowing through an AI system here. Without a BAA or documented data-handling policy, this is an immediate compliance concern.",
+  },
+  MODEL_INTEGRITY: {
+    riskReason:
+      "Model-integrity concern on {name} in {repo}/{file}. Confirm version, owner, and review cadence are documented and enforced.",
+    whyFlagged:
+      "A model without clear ownership or versioning is running in your environment. If it regresses, you will not know until users notice.",
+  },
+};
+
+/**
+ * Resolve a curated risk reason and plain-English explanation when the
+ * LLM classifier is unavailable. Token-replaces `{name}`, `{repo}`, `{file}`.
+ * Escalation reasons are appended so the operator still sees the full story.
+ */
+export function resolveFallbackReason(
+  detectionClass: DetectionClass,
+  vars: { name: string; repo: string; file: string },
+  escalationReasons: string[],
+): { riskReason: string; whyFlagged: string; description: string } {
+  const template =
+    FALLBACK_TEMPLATES[detectionClass] ?? FALLBACK_TEMPLATES.MODEL_INTEGRITY;
+
+  const fill = (s: string) =>
+    s
+      .replace(/\{name\}/g, vars.name)
+      .replace(/\{repo\}/g, vars.repo)
+      .replace(/\{file\}/g, vars.file);
+
+  const base = fill(template.riskReason);
+  const withEscalation =
+    escalationReasons.length > 0
+      ? `${base} ${escalationReasons[0]}`
+      : base;
+
+  return {
+    riskReason: withEscalation.slice(0, 600),
+    whyFlagged: fill(template.whyFlagged).slice(0, 400),
+    description: `${detectionClass
+      .replace(/_/g, " ")
+      .toLowerCase()} detected in ${vars.repo}`,
+  };
+}

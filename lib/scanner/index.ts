@@ -24,7 +24,10 @@ import {
   NON_AI_EXPERIMENT_EXCLUSIONS,
   FLAG_FILE_PATHS,
   AI_FLAG_NAME_PATTERN,
+  resolveComplianceTags,
+  resolveFallbackReason,
   type DetectionPattern,
+  type DetectionClass,
 } from "./detection-classes";
 import {
   getSuppressedPatterns,
@@ -141,10 +144,19 @@ function computeBaseRisk(agent: FoundAgent, pattern: DetectionPattern, boostMap:
     }
   }
 
-  // Hardcoded secrets → always critical
-  if (agent.has_secrets) {
+  // Hardcoded secrets handling — critical only when we're confident this is
+  // a real leak. Example files and prototypes don't count, and a lone regex
+  // match shouldn't crown a finding CRITICAL on its own.
+  if (agent.has_secrets && looksLikeRealSecret(agent)) {
     level = "critical";
-    reasons.push("Hardcoded credentials detected in AI system — immediate rotation required.");
+    reasons.push(
+      "Hardcoded credentials detected in AI system — rotate immediately and audit whether this secret has shipped to production.",
+    );
+  } else if (agent.has_secrets) {
+    level = maxRisk(level, "high");
+    reasons.push(
+      "Secret-like token found in this file. Appears to be an example or test value — confirm it is not a real credential before ignoring.",
+    );
   }
 
   // Inline content signals
@@ -160,6 +172,37 @@ function computeBaseRisk(agent: FoundAgent, pattern: DetectionPattern, boostMap:
   }
 
   return { floor: level, escalationReasons: [...new Set(reasons)] }; // dedupe
+}
+
+/**
+ * Conservative heuristic for whether a regex-matched "secret" is likely a
+ * real leaked credential instead of an example value in .env.example, a
+ * test fixture, or a README snippet. False positives here are worse than
+ * false negatives — we'd rather downgrade a real leak to HIGH than crown
+ * a demo fixture as CRITICAL and lose the room.
+ */
+function looksLikeRealSecret(agent: FoundAgent): boolean {
+  const p = agent.file_path.toLowerCase();
+  // Example / template / fixture / docs paths — not real
+  if (
+    /\.env\.(example|sample|template)$/.test(p) ||
+    /\.env\.local\.example$/.test(p) ||
+    /\/(example|examples|fixtures?|docs?|test|tests|__mocks?__|spec)\//.test(p) ||
+    /readme/.test(p) ||
+    /\.md$/.test(p) ||
+    /\.lock$/.test(p)
+  ) {
+    return false;
+  }
+  // Obviously placeholder values
+  if (
+    /example|placeholder|your.?api.?key|my.?secret|xxxx+|<.*>/i.test(
+      agent.content.slice(0, 3000),
+    )
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function maxRisk(a: string, b: string): string {
@@ -279,33 +322,70 @@ Risk level rules (STRICT — never downgrade below "${floor}"):
       ? Math.min(100, Math.max(0, result.confidence_score))
       : tier1Confidence(agent, pattern);
 
+    // Deterministic compliance tags (class floor + PHI + validated LLM tags)
+    const complianceTags = resolveComplianceTags(
+      agent.detection_class as DetectionClass,
+      agent.phi_context,
+      Array.isArray(result.compliance_tags) ? result.compliance_tags : [],
+    );
+
     return {
       risk_level: finalLevel,
       risk_reason: allReasons.slice(0, 600),
       why_flagged: (result.why_flagged ?? result.risk_reason ?? "").slice(0, 400),
       description: result.description ?? `${agent.agent_type} detected`,
-      compliance_tags: Array.isArray(result.compliance_tags) ? result.compliance_tags : [],
+      compliance_tags: complianceTags,
       confidence_score: confidence,
     };
   } catch {
+    // Curated fallback — never falls back to a generic "AI detected" string.
+    const fb = resolveFallbackReason(
+      agent.detection_class as DetectionClass,
+      {
+        name: agent.agent_type || agent.name,
+        repo: agent.repo,
+        file: agent.file_path,
+      },
+      escalationReasons,
+    );
     return {
       risk_level: floor,
-      risk_reason: escalationReasons.join(" | ") || "Classified by heuristic (GPT unavailable)",
-      why_flagged: `An AI system was detected in your codebase that requires review. ${escalationReasons[0] ?? ""}`,
-      description: `${agent.agent_type} detected in ${agent.repo}`,
-      compliance_tags: agent.phi_context ? ["HIPAA"] : [],
+      risk_reason: fb.riskReason,
+      why_flagged: fb.whyFlagged,
+      description: fb.description,
+      compliance_tags: resolveComplianceTags(
+        agent.detection_class as DetectionClass,
+        agent.phi_context,
+      ),
       confidence_score: tier1Confidence(agent, pattern),
     };
   }
 }
 
-/** Heuristic confidence without GPT — based on tier + signals */
+/**
+ * Heuristic confidence without GPT. Tier 1-2 patterns are precise (SDK
+ * imports, named clients, Octokit, etc.) and start high. Tier 3+ patterns
+ * are broader (wandb, xgboost, generic ML library names) and start lower
+ * unless we see PHI context, a prototype path, or strong content signals.
+ * This keeps the "247 assets found" number credible instead of flooding
+ * the UI with low-signal detections.
+ */
 function tier1Confidence(agent: FoundAgent, pattern: DetectionPattern): number {
-  let score = 90 - (pattern.tier - 1) * 12; // tier 1 = 90, tier 4 = 54
-  if (agent.phi_context) score = Math.min(100, score + 10);
-  if (agent.has_secrets) score = Math.min(100, score + 10);
+  const tier = pattern.tier ?? 3;
+  let score: number;
+  if (tier <= 2) {
+    score = 92 - (tier - 1) * 6; // tier 1=92, tier 2=86
+  } else {
+    // Tier 3+ starts around 55 and only climbs with corroborating signals.
+    score = 55;
+  }
+  if (agent.phi_context) score = Math.min(100, score + 12);
+  if (agent.has_secrets) score = Math.min(100, score + 8);
   if (agent.is_prototype) score += 5;
   if (agent.signal_score > 0.5) score = Math.min(100, score + 8);
+  if (agent.days_since_commit !== null && agent.days_since_commit > 180) {
+    score = Math.min(100, score + 6);
+  }
   return Math.max(30, Math.min(100, Math.round(score)));
 }
 
