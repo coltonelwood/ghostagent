@@ -317,12 +317,7 @@ function ConnectorHealth({
 }
 
 // --------------------------------------------------------------------------
-// Clean-scan dashboard — shown when the user has active connectors but
-// zero assets. Explicitly frames this as a GOOD result (no production
-// AI surface detected) instead of a blank onboarding state. This is the
-// "cal.com / outline-shaped customer" experience — their codebase is
-// genuinely clean and the dashboard should celebrate that, not imply
-// the product is broken.
+// Clean-scan dashboard — connectors exist but zero assets found
 // --------------------------------------------------------------------------
 
 function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
@@ -333,122 +328,188 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
         description="Your production AI surface is currently clean."
       />
 
-      <div className="nx-surface flex flex-col gap-6 p-6 sm:flex-row sm:items-start">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-success/20 bg-success/10">
+      <div className="nx-surface flex flex-col items-center gap-4 px-6 py-12 text-center">
+        <div className="flex size-12 items-center justify-center rounded-full border border-success/20 bg-success/10">
           <ShieldCheck className="size-6 text-success" aria-hidden />
         </div>
-        <div className="flex-1 space-y-3">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight">
-              No production AI assets detected
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Spekris scanned{" "}
-              <span className="nx-tabular font-medium text-foreground">
-                {analytics.connectorCount}
-              </span>{" "}
-              connected source
-              {analytics.connectorCount === 1 ? "" : "s"} and found no
-              operational AI systems in your environment. This is a real,
-              positive result — it means no undisclosed LLM integrations,
-              orphaned models, or unmonitored automation were found in the
-              paths we scanned.
-            </p>
-          </div>
-
-          <div className="rounded-md border border-border bg-muted/30 p-4 text-[13px] leading-relaxed text-muted-foreground">
-            <p className="font-medium text-foreground">What this result means</p>
-            <ul className="mt-2 space-y-1.5 list-disc list-inside">
-              <li>
-                No code files in your scanned repos match known LLM SDK
-                signatures.
-              </li>
-              <li>
-                No dependency manifests declare AI providers like{" "}
-                <span className="nx-mono">openai</span>,{" "}
-                <span className="nx-mono">anthropic</span>, or{" "}
-                <span className="nx-mono">langchain</span>.
-              </li>
-              <li>
-                No <span className="nx-mono">.env.example</span> files
-                reference AI API keys.
-              </li>
-              <li>
-                Developer-tooling configurations like{" "}
-                <span className="nx-mono">.cursor/</span> or{" "}
-                <span className="nx-mono">agents/rules/</span> are classified
-                as non-operational and excluded from risk scoring.
-              </li>
-            </ul>
-          </div>
-
-          <p className="text-xs text-muted-foreground/80">
-            Keep in mind: a clean scan reflects what we could see in the
-            repositories and file paths we inspected. If your team ships AI
-            through separate plugin repositories, external services, or
-            unconnected environments, those won&apos;t appear here. Connect
-            additional sources or review your connector configuration below to
-            widen coverage.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <Link
-              href="/platform/connectors"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Review connectors
-              <ArrowRight className="size-3.5" />
-            </Link>
-            <Link
-              href="/platform/events"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              View scan events
-              <ArrowRight className="size-3.5" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Sources connected"
-          value={analytics.connectorCount}
-          icon={Plug}
-          description="Actively syncing"
+        <h2 className="text-lg font-semibold tracking-tight">
+          No AI agents detected
+        </h2>
+        <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+          Scanned {analytics.connectorCount} source{analytics.connectorCount === 1 ? "" : "s"} and
+          found no operational AI. Connect more sources to broaden coverage.
+        </p>
+        <Link
           href="/platform/connectors"
-        />
-        <StatCard
-          label="Assets discovered"
-          value={0}
-          icon={Database}
-          tone="success"
-          description="Clean — nothing operational"
-        />
-        <StatCard
-          label="Open violations"
-          value={analytics.openViolations}
-          icon={ShieldAlert}
-          tone={analytics.openViolations > 0 ? "warning" : "success"}
-          description={
-            analytics.openViolations > 0
-              ? "Policy breaches still need attention"
-              : "None"
-          }
-          href="/platform/policies"
-        />
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Add more sources
+          <ArrowRight className="size-3.5" />
+        </Link>
       </div>
 
       {analytics.recentEvents.length > 0 && (
         <RecentEvents events={analytics.recentEvents} />
       )}
+    </div>
+  );
+}
 
-      <p className="text-[11px] text-muted-foreground/70">
-        Spekris surfaces evidence to support governance and compliance work. A
-        clean scan is a snapshot of what we observed in the sources you
-        connected — re-run scans regularly or add more sources to broaden
-        coverage.
-      </p>
+// --------------------------------------------------------------------------
+// Insights — actionable recommendations based on scan data
+// --------------------------------------------------------------------------
+
+interface Insight {
+  severity: "critical" | "warning" | "info" | "success";
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}
+
+function generateInsights(analytics: AnalyticsData): Insight[] {
+  const insights: Insight[] = [];
+
+  const critical = analytics.assetsByRiskLevel["critical"] ?? 0;
+  const high = analytics.assetsByRiskLevel["high"] ?? 0;
+
+  if (critical > 0) {
+    insights.push({
+      severity: "critical",
+      title: `${critical} critical-risk AI asset${critical === 1 ? "" : "s"} need immediate review`,
+      description: "These assets pose the highest governance risk — unmonitored, unowned, or using sensitive data.",
+      href: "/platform/assets?risk=critical",
+      action: "Review now",
+    });
+  }
+
+  if (analytics.orphanedAssets > 0) {
+    insights.push({
+      severity: "warning",
+      title: `${analytics.orphanedAssets} AI asset${analytics.orphanedAssets === 1 ? "" : "s"} have no owner`,
+      description: "Unowned AI agents are a compliance gap. Assign an owner so someone is accountable.",
+      href: "/platform/assets?owner=orphaned",
+      action: "Assign owners",
+    });
+  }
+
+  if (analytics.openViolations > 0) {
+    insights.push({
+      severity: "warning",
+      title: `${analytics.openViolations} open policy violation${analytics.openViolations === 1 ? "" : "s"}`,
+      description: "These assets breach your governance policies and need attention.",
+      href: "/platform/policies",
+      action: "View violations",
+    });
+  }
+
+  if (high > 0 && critical === 0) {
+    insights.push({
+      severity: "warning",
+      title: `${high} high-risk asset${high === 1 ? "" : "s"} detected`,
+      description: "No critical issues, but these assets should be reviewed for proper governance.",
+      href: "/platform/assets?risk=high",
+      action: "Review assets",
+    });
+  }
+
+  if (analytics.connectorCount === 1) {
+    insights.push({
+      severity: "info",
+      title: "Only 1 source connected",
+      description: "Connect more sources (GitLab, AWS, cloud platforms) to get full visibility across your org.",
+      href: "/platform/connectors",
+      action: "Add source",
+    });
+  }
+
+  if (analytics.complianceScore !== null && analytics.complianceScore < 70) {
+    insights.push({
+      severity: "warning",
+      title: `Compliance score is ${analytics.complianceScore}%`,
+      description: "Review your compliance gaps and address the top issues to improve your posture.",
+      href: "/platform/compliance",
+      action: "View gaps",
+    });
+  }
+
+  if (insights.length === 0) {
+    insights.push({
+      severity: "success",
+      title: "Looking good — no urgent issues",
+      description: "All AI assets are owned, no policy violations, and risk levels are under control.",
+      href: "/platform/assets",
+      action: "View assets",
+    });
+  }
+
+  return insights.slice(0, 4);
+}
+
+const insightStyles = {
+  critical: {
+    border: "border-destructive/30",
+    bg: "bg-destructive/5",
+    dot: "bg-destructive",
+    text: "text-destructive",
+  },
+  warning: {
+    border: "border-warning/30",
+    bg: "bg-warning/5",
+    dot: "bg-warning",
+    text: "text-warning",
+  },
+  info: {
+    border: "border-primary/30",
+    bg: "bg-primary/5",
+    dot: "bg-primary",
+    text: "text-primary",
+  },
+  success: {
+    border: "border-success/30",
+    bg: "bg-success/5",
+    dot: "bg-success",
+    text: "text-success",
+  },
+} as const;
+
+function InsightsPanel({ analytics }: { analytics: AnalyticsData }) {
+  const insights = generateInsights(analytics);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-[13px] font-semibold tracking-tight">
+        Recommended actions
+      </h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {insights.map((insight, i) => {
+          const style = insightStyles[insight.severity];
+          return (
+            <Link
+              key={i}
+              href={insight.href}
+              className={cn(
+                "nx-surface flex flex-col gap-2 p-4 transition-colors hover:border-border-strong",
+                style.border,
+                style.bg,
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className={cn("size-2 rounded-full shrink-0", style.dot)} />
+                <span className="text-[13px] font-semibold text-foreground leading-snug">
+                  {insight.title}
+                </span>
+              </div>
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                {insight.description}
+              </p>
+              <span className={cn("text-[12px] font-medium mt-auto", style.text)}>
+                {insight.action} →
+              </span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -520,59 +581,16 @@ export function CommandCenterDashboard({
         </div>
       </div>
 
+      {/* Insights — actionable recommendations */}
+      <InsightsPanel analytics={analytics} />
+
       {/* Risk distribution bar */}
       <RiskDistribution byLevel={analytics.assetsByRiskLevel} />
 
-      {/* Recent activity + scan action */}
+      {/* Recent activity */}
       <div className="grid gap-4 lg:grid-cols-2">
         <RecentEvents events={analytics.recentEvents} />
         <SourceDistribution bySource={analytics.assetsBySource} />
-      </div>
-
-      {/* Quick links — collapsed secondary info */}
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Link
-          href="/platform/policies"
-          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
-        >
-          <ShieldAlert className="size-4 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold nx-tabular">{analytics.openViolations}</p>
-            <p className="text-[11px] text-muted-foreground">Open violations</p>
-          </div>
-        </Link>
-        <Link
-          href="/platform/assets?owner=orphaned"
-          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
-        >
-          <UserX className="size-4 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold nx-tabular">{analytics.orphanedAssets}</p>
-            <p className="text-[11px] text-muted-foreground">Orphaned assets</p>
-          </div>
-        </Link>
-        {analytics.complianceScore !== null && (
-          <Link
-            href="/platform/compliance"
-            className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
-          >
-            <ClipboardCheck className="size-4 text-muted-foreground" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold nx-tabular">{analytics.complianceScore}%</p>
-              <p className="text-[11px] text-muted-foreground">Compliance</p>
-            </div>
-          </Link>
-        )}
-        <Link
-          href="/platform/connectors"
-          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
-        >
-          <Plug className="size-4 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold nx-tabular">{analytics.connectorCount}</p>
-            <p className="text-[11px] text-muted-foreground">Connectors</p>
-          </div>
-        </Link>
       </div>
     </div>
   );
