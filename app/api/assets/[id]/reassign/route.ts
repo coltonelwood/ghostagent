@@ -35,13 +35,15 @@ const handler = withLogging(
       }
 
       const body = (await req.json()) as {
-        ownerEmail: string;
+        ownerEmail?: string;
+        owner_email?: string;
         reason?: string;
       };
 
-      if (!body.ownerEmail) {
+      const newOwner = body.ownerEmail || body.owner_email;
+      if (!newOwner) {
         return NextResponse.json(
-          { error: "ownerEmail is required" },
+          { error: "owner_email is required" },
           { status: 400 },
         );
       }
@@ -52,7 +54,7 @@ const handler = withLogging(
       const { data: updated, error } = await db
         .from("assets")
         .update({
-          owner_email: body.ownerEmail,
+          owner_email: newOwner,
           owner_status: "active_owner",
           owner_confidence: 100,
           owner_source: "manual_assignment",
@@ -69,7 +71,7 @@ const handler = withLogging(
         asset_id: id,
         org_id: auth.orgId,
         previous_owner_email: asset.owner_email,
-        new_owner_email: body.ownerEmail,
+        new_owner_email: newOwner,
         changed_by: auth.userId,
         reason: body.reason ?? "manual_reassignment",
       });
@@ -80,10 +82,10 @@ const handler = withLogging(
         kind: "owner_assigned",
         severity: "info",
         title: `Owner reassigned: ${asset.name}`,
-        body: `Owner changed from ${asset.owner_email ?? "unassigned"} to ${body.ownerEmail}`,
+        body: `Owner changed from ${asset.owner_email ?? "unassigned"} to ${newOwner}`,
         metadata: {
           previousOwner: asset.owner_email,
-          newOwner: body.ownerEmail,
+          newOwner,
           reason: body.reason,
         },
         assetId: id,
@@ -99,7 +101,7 @@ const handler = withLogging(
         resourceId: id,
         metadata: {
           previousOwner: asset.owner_email,
-          newOwner: body.ownerEmail,
+          newOwner,
           reason: body.reason,
         },
         req,
