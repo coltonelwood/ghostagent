@@ -11,6 +11,7 @@ import {
   Activity,
   CheckCircle2,
   Lock,
+  Search,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,102 +34,97 @@ const CONNECTORS = [
 ];
 
 const FRAMEWORKS = [
-  { abbr: "SOC 2", desc: "Map findings to CC6.6, CC7.1, CC7.2, CC8.1" },
-  { abbr: "HIPAA", desc: "Flag PHI exposure and missing BAAs" },
-  { abbr: "EU AI Act", desc: "Evidence for high-risk system documentation" },
-  { abbr: "ISO 42001", desc: "Governance, impact, and accountability artifacts" },
+  { abbr: "EU AI Act", desc: "Generate documentation for high-risk AI system registries" },
+  { abbr: "SOC 2", desc: "Map findings to CC6.6, CC7.1, CC7.2, CC8.1 controls" },
+  { abbr: "ISO 42001", desc: "Governance, impact assessment, and accountability artifacts" },
+  { abbr: "NIST AI RMF", desc: "Risk identification and management aligned to the AI Risk Management Framework" },
 ];
 
 const PROBLEMS = [
   {
-    icon: UserX,
-    title: "Unowned AI agents",
-    body: "Scripts and services still running in production — connected to APIs, customer data, and payment systems — with no owner on record. They don't appear in any inventory.",
+    icon: ShieldAlert,
+    title: "Shadow AI",
+    body: "Teams are deploying AI agents, LLM integrations, and automation workflows without security review or documented oversight. If it's not in your inventory, you can't govern it.",
   },
   {
-    icon: ShieldAlert,
-    title: "Silent PHI exposure",
-    body: "LLM integrations may be processing patient data without documented oversight. A missing BAA or unreviewed integration creates exposure you can't see.",
+    icon: UserX,
+    title: "Orphaned agents",
+    body: "When creators leave the company, their AI systems keep running — connected to APIs, customer data, and cloud resources — with no owner on record.",
   },
   {
     icon: FileWarning,
     title: "Compliance gaps",
-    body: "SOC 2, HIPAA, and EU AI Act assessments now include questions about AI systems. Most engineering teams don't have a complete inventory ready.",
+    body: "Regulators and auditors are asking about your AI systems. EU AI Act, SOC 2, and ISO 42001 assessments now expect a documented inventory most teams don't have.",
   },
 ];
 
 const STEPS = [
   {
     n: "01",
-    title: "Connect sources",
-    body: "Link GitHub, GitLab, AWS, Zapier, n8n, and HR systems. Credentials are encrypted with AES-256-GCM before storage and never returned to the client.",
+    title: "Connect your sources",
+    body: "Link GitHub, GitLab, AWS, Azure, GCP, Zapier, n8n, Make, and HR systems like BambooHR or Rippling. Credentials are encrypted with AES-256-GCM before storage.",
   },
   {
     n: "02",
-    title: "Discover AI systems",
-    body: "Spekris scans connected sources for LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services.",
+    title: "Spekris scans for AI systems",
+    body: "Scans repos for agent frameworks (CrewAI, AutoGen, LangGraph, LangChain), AI dependencies in package.json and requirements.txt, LLM API keys in .env files, and AI patterns in Dockerfiles and Terraform.",
   },
   {
     n: "03",
-    title: "Identify owners",
-    body: "Cross-reference HR data to find current owners. When engineers leave, their AI systems are flagged as unowned and escalated to the right team.",
-  },
-  {
-    n: "04",
-    title: "Enforce policies",
-    body: "Define ownership requirements, PHI handling rules, and risk thresholds. Violations create tasks, send alerts, and land in the audit log.",
+    title: "Review, govern, track",
+    body: "Review discovered assets, classify by kind, set governance policies, and track compliance posture. Every discovery, change, and policy violation is logged in the audit trail.",
   },
 ];
 
 const MODULES = [
   {
     icon: Database,
-    title: "Asset registry",
-    body: "Every AI system Spekris discovers, with ownership, risk score, environment, and compliance tags.",
+    title: "AI System Inventory",
+    body: "Discover agents, pipelines, LLM integrations, and ML workflows across connected repos. Assets are classified by kind: agent, pipeline, workflow, script, or integration.",
   },
   {
     icon: Activity,
-    title: "Risk engine",
-    body: "Heuristic + LLM classification with explainable scoring. Every risk has a reason, not just a number.",
+    title: "Risk Scoring",
+    body: "Rule-based heuristic scoring across 10 dimensions — ownership, data sensitivity, environment, compliance gaps, and more. Every score has an explanation.",
   },
   {
     icon: UserX,
-    title: "Ownership engine",
-    body: "HR-cross-referenced owner detection. Automatically flags orphaned assets when engineers depart.",
+    title: "Ownership Tracking",
+    body: "Cross-references with HR systems to assign and verify owners. Automatically detects orphaned AI when an owner leaves the company.",
   },
   {
     icon: Shield,
-    title: "Policy engine",
-    body: "Visual condition builder. Trigger tasks, alerts, or quarantine when rules match.",
+    title: "Policy Engine",
+    body: "Define governance rules, auto-evaluate assets against them, and trigger alerts, quarantine asset records, or create tasks when violations occur.",
   },
   {
     icon: ClipboardCheck,
-    title: "Compliance reporting",
-    body: "Findings mapped to SOC 2, HIPAA, EU AI Act, and ISO 42001 controls. Export audit-ready evidence.",
+    title: "Compliance Support",
+    body: "Generate documentation for EU AI Act, SOC 2, ISO 42001, and NIST AI RMF. Spekris supports your compliance efforts — it does not certify compliance.",
   },
   {
-    icon: Plug,
-    title: "Connector framework",
-    body: "Ten integrations out of the box across code, cloud, automation, and HR — plus a custom SDK.",
+    icon: Search,
+    title: "Audit Trail",
+    body: "Every discovery, classification change, policy violation, and governance action is logged. Export structured evidence for your security team or assessor.",
   },
 ];
 
 const TESTIMONIALS = [
   {
     quote:
-      "First scan found 14 AI integrations we had no record of. Three were actively processing customer data with no owner — their authors had left the company months earlier.",
+      "First scan found 14 AI integrations we had no record of. Three had no owner — their authors had left the company months earlier.",
     name: "VP of Engineering",
     co: "Series B fintech, 180 engineers",
   },
   {
     quote:
-      "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Spekris and had a structured report to share in under an hour. That conversation went a lot better than it would have otherwise.",
+      "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Spekris and had a structured report to share in under an hour.",
     name: "Head of Security",
-    co: "Healthcare SaaS, 120 employees",
+    co: "Enterprise SaaS, 120 employees",
   },
   {
     quote:
-      "We had a spreadsheet. It was always out of date. Now Spekris just updates it automatically whenever a new AI integration gets pushed.",
+      "We had a spreadsheet. It was always out of date. Now Spekris updates the inventory automatically whenever a new AI integration gets pushed to our repos.",
     name: "Engineering Manager",
     co: "Legal tech platform, 90 engineers",
   },
@@ -160,7 +156,7 @@ const PLANS = [
       "Unlimited connectors",
       "Unlimited assets",
       "Full policy engine",
-      "All 4 compliance frameworks",
+      "EU AI Act, SOC 2, ISO 42001, NIST AI RMF",
       "Slack + webhook alerts",
       "Audit log export",
       "Priority support",
@@ -374,23 +370,23 @@ export default function LandingPage() {
           <div className="space-y-6 lg:col-span-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
               <span className="size-1.5 rounded-full bg-primary" />
-              AI governance, control plane
+              AI system visibility and control
             </div>
             <h1 className="text-[2.5rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-              Know every AI system running inside your company.
+              Know every AI system running in your company.
             </h1>
             <p className="max-w-xl text-base text-muted-foreground leading-relaxed">
-              Spekris scans your code, cloud, and automation stack to surface AI
-              agents, LLM integrations, and ML services — then assigns ownership,
-              scores risk, and maps findings to the compliance frameworks your
-              auditors care about.
+              Spekris scans your GitHub, GitLab, and cloud environments to
+              discover AI agents, LLM integrations, and automation workflows.
+              It assigns ownership, scores risk, and generates documentation
+              for the compliance frameworks your auditors care about.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/auth/login"
                 className={cn(buttonVariants({ size: "lg" }), "h-11 px-6")}
               >
-                Start free trial
+                Start scanning
                 <ArrowRight className="size-4" />
               </Link>
               <Link
@@ -400,7 +396,7 @@ export default function LandingPage() {
                   "h-11 px-6",
                 )}
               >
-                See a live scan
+                See how it works
               </Link>
             </div>
             <p className="text-xs text-muted-foreground/70">
@@ -494,10 +490,10 @@ export default function LandingPage() {
             How it works
           </div>
           <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Four steps from zero visibility to a complete AI inventory.
+            Three steps from zero visibility to a governed AI inventory.
           </h2>
 
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid gap-4 sm:grid-cols-3">
             {STEPS.map((step) => (
               <div
                 key={step.n}
@@ -522,10 +518,10 @@ export default function LandingPage() {
       <section className="border-b border-border">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-primary">
-            Product modules
+            Features
           </div>
           <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            One control plane. Six connected workflows.
+            Visibility, governance, and compliance in one platform.
           </h2>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -556,11 +552,12 @@ export default function LandingPage() {
             Connectors
           </div>
           <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Cover every place AI ships — not just your repo.
+            Scan across code, cloud, automation, and HR.
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Ten integrations across code, cloud, automation, and HR. A custom
-            SDK for proprietary systems, available on Professional and Enterprise.
+            10+ integrations across the systems where AI ships. Connect repos,
+            cloud accounts, automation platforms, and HR systems. A custom
+            SDK for proprietary systems is available on Professional and Enterprise.
           </p>
 
           <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -586,12 +583,13 @@ export default function LandingPage() {
             Compliance
           </div>
           <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Evidence for the frameworks your auditors actually ask about.
+            Documentation for the frameworks your auditors ask about.
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Spekris maps findings to specific controls across four frameworks so
-            you can hand structured evidence to your security team or your
-            assessor. Spekris does not certify compliance — it helps you prepare.
+            Spekris generates compliance documentation mapped to specific controls
+            across four frameworks, so you can hand structured evidence to your
+            security team or assessor. Spekris supports your compliance efforts
+            — it does not certify compliance.
           </p>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2">
@@ -764,7 +762,7 @@ export default function LandingPage() {
       <section className="border-b border-border">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Know what AI is running in your company.
+            Start building your AI system inventory today.
           </h2>
           <p className="mt-4 text-base text-muted-foreground">
             Connect your first source in under five minutes.
@@ -774,7 +772,7 @@ export default function LandingPage() {
               href="/auth/login"
               className={cn(buttonVariants({ size: "lg" }), "h-11 px-6")}
             >
-              Start free trial
+              Start scanning
               <ArrowRight className="size-4" />
             </Link>
             <Link
@@ -784,7 +782,7 @@ export default function LandingPage() {
                 "h-11 px-6",
               )}
             >
-              See a live scan
+              See how it works
             </Link>
           </div>
         </div>
