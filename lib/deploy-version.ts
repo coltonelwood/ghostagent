@@ -1,2 +1,2 @@
-// Deploy trigger v7 — auto compliance
-export const DEPLOY_VERSION = "v7.2026-04-12-auto-compliance";
+// Deploy trigger v8 — auto compliance on detail pages
+export const DEPLOY_VERSION = "v8.2026-04-12-compliance-detail-fix";
