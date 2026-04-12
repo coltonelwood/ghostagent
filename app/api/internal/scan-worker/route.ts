@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runScan } from "@/lib/scanner";
 import { syncConnector, scheduleOrgSyncs } from "@/lib/sync-orchestrator";
+import { verifyInternalKey } from "@/lib/internal-auth";
 import { logger } from "@/lib/logger";
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  const key = req.headers.get("x-internal-key");
-  if (key !== process.env.INTERNAL_API_KEY) {
+  if (!verifyInternalKey(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json() as {
+  let body: {
     scanId?: string;
     workspaceId?: string;
     connectorId?: string;
     scheduleAll?: boolean;
   };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Request body must be JSON" },
+      { status: 400 },
+    );
+  }
 
   // Legacy: GhostAgent repo scan
   if (body.scanId && body.workspaceId) {

@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scheduleOrgSyncs } from "@/lib/sync-orchestrator";
+import { verifyCronSecret } from "@/lib/internal-auth";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function isAuthorized(req: NextRequest): boolean {
-  // Vercel cron sends this header in production
-  const cronSecret = req.headers.get("authorization");
-  const internalKey = process.env.INTERNAL_API_KEY;
-  if (internalKey && cronSecret === `Bearer ${internalKey}`) return true;
-  // Allow Vercel's own cron invocation (loopback only in production)
-  if (process.env.NODE_ENV !== "production") return true;
-  return false;
-}
-
+/**
+ * Vercel cron endpoint — schedules connector syncs for any org whose
+ * last sync is stale. Authorized via CRON_SECRET (Vercel sends it as
+ * `Authorization: Bearer <CRON_SECRET>`). Fails closed on missing
+ * secret so a misconfigured deploy never exposes this publicly.
+ *
+ * Previously used INTERNAL_API_KEY here, which was inconsistent with
+ * the other cron routes and would silently stop working if an
+ * operator rotated INTERNAL_API_KEY without also updating the cron
+ * invocation.
+ */
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!verifyCronSecret(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   try {
