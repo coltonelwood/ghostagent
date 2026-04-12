@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
+// Dashboard v2 — deployed 2026-04-12
 export default async function PlatformDashboardPage() {
   const supabase = await createClient();
   const {
@@ -13,16 +14,12 @@ export default async function PlatformDashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  // Forward cookies so the API route can authenticate the request
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
 
-  // Derive the base URL from the incoming request so this works in
-  // local dev, preview deploys, and production without relying on
-  // NEXT_PUBLIC_APP_URL being set to the right thing.
   const hdrs = await headers();
   const host = hdrs.get("x-forwarded-host") ?? hdrs.get("host");
   const proto = hdrs.get("x-forwarded-proto") ?? "https";
