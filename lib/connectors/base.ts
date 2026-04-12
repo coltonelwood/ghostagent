@@ -526,6 +526,177 @@ export function classifyFilePathContext(filePath: string): FilePathContext {
   return "unknown";
 }
 
+// ==========================================================================
+// Hidden AI detection — dependency manifests + env vars
+// ==========================================================================
+//
+// Code search (the connector's default path) only matches files that
+// import an AI library directly. That misses the most common way real
+// companies ship AI:
+//
+//   1. A shared wrapper module (`services/ai.ts`) calls OpenAI. Every
+//      consumer in the app calls `summarize(text)` instead of
+//      `openai.chat.completions`, so code search only returns one file.
+//   2. The AI library is declared in `package.json` / `pyproject.toml`
+//      but not imported anywhere in the search path (e.g. it's loaded
+//      in a background worker outside the main tree).
+//   3. The API key is committed to `.env.example` with a comment like
+//      `# Required for the AI summarization feature` — a human knows
+//      this is AI, code search does not.
+//
+// The patterns below are matched against raw manifest/env-file text so
+// we catch these cases without needing a full parser. Matches are
+// conservative — "openai" alone won't match a random word, only the
+// known package-name shapes and env-var shapes.
+// ==========================================================================
+
+/**
+ * Package / dependency names that mean "this project uses AI".
+ * Matched against raw manifest text (package.json, pyproject.toml,
+ * requirements.txt, Gemfile, composer.json, go.mod, etc.) so we catch
+ * declarations without needing a full parser per ecosystem.
+ *
+ * The regex requires a word boundary before the match so a random
+ * comment containing "openai" doesn't false-positive.
+ */
+export interface AIDependency {
+  provider: string;
+  pattern: RegExp;
+}
+
+export const AI_DEPENDENCY_PATTERNS: AIDependency[] = [
+  // OpenAI ecosystem
+  { provider: "openai", pattern: /["'`]\s*openai\b/i },
+  { provider: "openai", pattern: /["'`]@azure\/openai["'`]/i },
+  { provider: "openai", pattern: /openai-php\/client/i },
+  { provider: "openai", pattern: /ruby-openai/i },
+  { provider: "openai", pattern: /go-openai/i },
+  { provider: "openai", pattern: /openai\.api_key/i },
+
+  // Anthropic
+  { provider: "anthropic", pattern: /["'`]@anthropic-ai\/sdk["'`]/i },
+  { provider: "anthropic", pattern: /["'`]anthropic["'`]/i },
+  { provider: "anthropic", pattern: /anthropic-sdk-\w+/i },
+
+  // LangChain family
+  { provider: "langchain", pattern: /["'`]langchain["'`]/i },
+  { provider: "langchain", pattern: /["'`]@langchain\/\w+/i },
+  { provider: "langchain", pattern: /langchaingo/i },
+  { provider: "langchain", pattern: /langchainrb/i },
+
+  // Other LLM / ML SDKs
+  { provider: "llamaindex", pattern: /["'`](llama[-_]?index|@llamaindex\/\w+)["'`]/i },
+  { provider: "huggingface", pattern: /["'`](@huggingface\/\w+|huggingface[-_]hub|transformers)["'`]/i },
+  { provider: "google", pattern: /["'`](@google\/generative-ai|google-generativeai|@google\/genai)["'`]/i },
+  { provider: "cohere", pattern: /["'`]cohere(-ai)?["'`]/i },
+  { provider: "replicate", pattern: /["'`]replicate["'`]/i },
+  { provider: "groq", pattern: /["'`]groq(-sdk)?["'`]/i },
+  { provider: "together-ai", pattern: /["'`]together(-ai)?["'`]/i },
+  { provider: "mistral", pattern: /["'`]@?mistralai?(\/\w+)?["'`]/i },
+
+  // Meta-SDKs and orchestration
+  { provider: "vercel-ai", pattern: /["'`]ai["'`]\s*:\s*["']\^?\d/i }, // Vercel AI SDK shows as "ai": "^x.y.z" in package.json
+  { provider: "litellm", pattern: /["'`]litellm["'`]/i },
+  { provider: "instructor", pattern: /["'`]instructor["'`]/i },
+  { provider: "dspy", pattern: /["'`]dspy(-ai)?["'`]/i },
+  { provider: "haystack", pattern: /["'`](haystack|farm-haystack)["'`]/i },
+  { provider: "vllm", pattern: /["'`]vllm["'`]/i },
+
+  // Framework-adjacent inference
+  { provider: "ollama", pattern: /["'`]ollama["'`]/i },
+  { provider: "openrouter", pattern: /["'`]openrouter["'`]/i },
+];
+
+/**
+ * Env var names that indicate "this project uses AI". A match in
+ * `.env.example` is a strong signal even without any code hits.
+ */
+export const AI_ENV_VAR_PATTERNS: Array<{ provider: string; pattern: RegExp }> = [
+  { provider: "openai", pattern: /^\s*OPENAI_API_KEY\s*=/im },
+  { provider: "openai", pattern: /^\s*AZURE_OPENAI_(API_KEY|ENDPOINT|DEPLOYMENT)\s*=/im },
+  { provider: "openai", pattern: /^\s*OPENAI_ORG(ANIZATION)?\s*=/im },
+  { provider: "anthropic", pattern: /^\s*ANTHROPIC_API_KEY\s*=/im },
+  { provider: "anthropic", pattern: /^\s*CLAUDE_API_KEY\s*=/im },
+  { provider: "google", pattern: /^\s*(GOOGLE_AI|GEMINI|GOOGLE_GENERATIVE_AI)_API_KEY\s*=/im },
+  { provider: "google", pattern: /^\s*VERTEX_AI_(PROJECT|LOCATION)\s*=/im },
+  { provider: "huggingface", pattern: /^\s*(HUGGINGFACE|HF)_(API_KEY|TOKEN|HUB_TOKEN)\s*=/im },
+  { provider: "cohere", pattern: /^\s*COHERE_API_KEY\s*=/im },
+  { provider: "replicate", pattern: /^\s*REPLICATE_API_(TOKEN|KEY)\s*=/im },
+  { provider: "groq", pattern: /^\s*GROQ_API_KEY\s*=/im },
+  { provider: "together-ai", pattern: /^\s*TOGETHER_(AI_)?API_KEY\s*=/im },
+  { provider: "mistral", pattern: /^\s*MISTRAL_API_KEY\s*=/im },
+  { provider: "perplexity", pattern: /^\s*PERPLEXITY_API_KEY\s*=/im },
+  { provider: "openrouter", pattern: /^\s*OPENROUTER_API_KEY\s*=/im },
+  { provider: "ollama", pattern: /^\s*OLLAMA_(HOST|BASE_URL)\s*=/im },
+];
+
+export interface ManifestMatch {
+  provider: string;
+  /** Which manifest file produced the match. */
+  manifestPath: string;
+}
+
+/**
+ * Extract every AI dependency match from a manifest file's text.
+ * Returns a list (duplicates deduped) so the caller can summarize
+ * "this project declares N AI providers".
+ */
+export function extractAIDependenciesFromManifest(
+  manifestPath: string,
+  content: string,
+): ManifestMatch[] {
+  const seen = new Set<string>();
+  const matches: ManifestMatch[] = [];
+  for (const dep of AI_DEPENDENCY_PATTERNS) {
+    if (dep.pattern.test(content)) {
+      if (seen.has(dep.provider)) continue;
+      seen.add(dep.provider);
+      matches.push({ provider: dep.provider, manifestPath });
+    }
+  }
+  return matches;
+}
+
+/**
+ * Extract every AI env-var match from a `.env.example`-shaped file.
+ * Duplicates (same provider seen twice) are deduped.
+ */
+export function extractAIEnvVarsFromFile(content: string): string[] {
+  const seen = new Set<string>();
+  for (const { provider, pattern } of AI_ENV_VAR_PATTERNS) {
+    if (pattern.test(content)) seen.add(provider);
+  }
+  return Array.from(seen);
+}
+
+/**
+ * Manifest files we check per repo. Order matters — we stop at the
+ * first one we find per ecosystem so we don't double-count a project
+ * that lists the same dependency in both pyproject.toml and
+ * requirements.txt.
+ */
+export const AI_MANIFEST_PATHS: readonly string[] = [
+  "package.json",
+  "pyproject.toml",
+  "requirements.txt",
+  "Pipfile",
+  "poetry.lock",
+  "go.mod",
+  "Gemfile",
+  "composer.json",
+  "Cargo.toml",
+  "build.gradle",
+  "pom.xml",
+];
+
+export const ENV_EXAMPLE_PATHS: readonly string[] = [
+  ".env.example",
+  ".env.sample",
+  ".env.template",
+  ".env.dist",
+  "env.example",
+];
+
 /**
  * Lightweight framework/catalog repo detector. Mirrors the heavier
  * version in lib/scanner/detection-classes.ts but kept here so the
