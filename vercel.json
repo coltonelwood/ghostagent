@@ -12,15 +12,5 @@
     "app/api/internal/sync-schedule/route.ts": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/internal/cleanup",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/internal/sync-schedule",
-      "schedule": "0 0 * * *"
-    }
-  ]
+  }
 }
