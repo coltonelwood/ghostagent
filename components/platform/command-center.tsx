@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Activity,
   Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
@@ -413,6 +414,143 @@ function ConnectorHealth({
 }
 
 // --------------------------------------------------------------------------
+// Clean-scan dashboard — shown when the user has active connectors but
+// zero assets. Explicitly frames this as a GOOD result (no production
+// AI surface detected) instead of a blank onboarding state. This is the
+// "cal.com / outline-shaped customer" experience — their codebase is
+// genuinely clean and the dashboard should celebrate that, not imply
+// the product is broken.
+// --------------------------------------------------------------------------
+
+function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Overview"
+        description="Your production AI surface is currently clean."
+      />
+
+      <div className="nx-surface flex flex-col gap-6 p-6 sm:flex-row sm:items-start">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-success/20 bg-success/10">
+          <ShieldCheck className="size-6 text-success" aria-hidden />
+        </div>
+        <div className="flex-1 space-y-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">
+              No production AI assets detected
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Nexus scanned{" "}
+              <span className="nx-tabular font-medium text-foreground">
+                {analytics.connectorCount}
+              </span>{" "}
+              connected source
+              {analytics.connectorCount === 1 ? "" : "s"} and found no
+              operational AI systems in your environment. This is a real,
+              positive result — it means no undisclosed LLM integrations,
+              orphaned models, or unmonitored automation were found in the
+              paths we scanned.
+            </p>
+          </div>
+
+          <div className="rounded-md border border-border bg-muted/30 p-4 text-[13px] leading-relaxed text-muted-foreground">
+            <p className="font-medium text-foreground">What this result means</p>
+            <ul className="mt-2 space-y-1.5 list-disc list-inside">
+              <li>
+                No code files in your scanned repos match known LLM SDK
+                signatures.
+              </li>
+              <li>
+                No dependency manifests declare AI providers like{" "}
+                <span className="nx-mono">openai</span>,{" "}
+                <span className="nx-mono">anthropic</span>, or{" "}
+                <span className="nx-mono">langchain</span>.
+              </li>
+              <li>
+                No <span className="nx-mono">.env.example</span> files
+                reference AI API keys.
+              </li>
+              <li>
+                Developer-tooling configurations like{" "}
+                <span className="nx-mono">.cursor/</span> or{" "}
+                <span className="nx-mono">agents/rules/</span> are classified
+                as non-operational and excluded from risk scoring.
+              </li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-muted-foreground/80">
+            Keep in mind: a clean scan reflects what we could see in the
+            repositories and file paths we inspected. If your team ships AI
+            through separate plugin repositories, external services, or
+            unconnected environments, those won&apos;t appear here. Connect
+            additional sources or review your connector configuration below to
+            widen coverage.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <Link
+              href="/platform/connectors"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Review connectors
+              <ArrowRight className="size-3.5" />
+            </Link>
+            <Link
+              href="/platform/events"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              View scan events
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Sources connected"
+          value={analytics.connectorCount}
+          icon={Plug}
+          description="Actively syncing"
+          href="/platform/connectors"
+        />
+        <StatCard
+          label="Assets discovered"
+          value={0}
+          icon={Database}
+          tone="success"
+          description="Clean — nothing operational"
+        />
+        <StatCard
+          label="Open violations"
+          value={analytics.openViolations}
+          icon={ShieldAlert}
+          tone={analytics.openViolations > 0 ? "warning" : "success"}
+          description={
+            analytics.openViolations > 0
+              ? "Policy breaches still need attention"
+              : "None"
+          }
+          href="/platform/policies"
+        />
+      </div>
+
+      {analytics.recentEvents.length > 0 && (
+        <RecentEvents events={analytics.recentEvents} />
+      )}
+
+      <p className="text-[11px] text-muted-foreground/70">
+        Nexus surfaces evidence to support governance and compliance work. A
+        clean scan is a snapshot of what we observed in the sources you
+        connected — re-run scans regularly or add more sources to broaden
+        coverage.
+      </p>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
 // Main dashboard
 // --------------------------------------------------------------------------
 
@@ -421,8 +559,15 @@ export function CommandCenterDashboard({
 }: {
   analytics: AnalyticsData | null;
 }) {
-  if (!analytics || analytics.totalAssets === 0) {
+  // Three states:
+  //   1. Analytics missing OR no connectors → true "never scanned" onboarding
+  //   2. Connectors exist but zero assets → "clean scan" positive result
+  //   3. Assets exist → full dashboard
+  if (!analytics || analytics.connectorCount === 0) {
     return <EmptyDashboard />;
+  }
+  if (analytics.totalAssets === 0) {
+    return <CleanScanDashboard analytics={analytics} />;
   }
 
   return (
