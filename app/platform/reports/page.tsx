@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileBarChart, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -52,16 +52,6 @@ const REPORTS: ReportMeta[] = [
   },
 ];
 
-function getStoredTimestamp(reportId: string): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(`report_generated_${reportId}`);
-}
-
-function setStoredTimestamp(reportId: string) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`report_generated_${reportId}`, new Date().toISOString());
-}
-
 function formatTimestamp(ts: string | null): string | null {
   if (!ts) return null;
   return new Date(ts).toLocaleString();
@@ -69,13 +59,32 @@ function formatTimestamp(ts: string | null): string | null {
 
 export default function ReportsPage() {
   const [generating, setGenerating] = useState<string | null>(null);
-  const [timestamps, setTimestamps] = useState<Record<string, string | null>>(() => {
-    const ts: Record<string, string | null> = {};
-    for (const r of REPORTS) {
-      ts[r.id] = getStoredTimestamp(r.id);
-    }
-    return ts;
-  });
+  const [timestamps, setTimestamps] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    fetch("/api/reports")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.data) {
+          const ts: Record<string, string | null> = {};
+          for (const r of REPORTS) {
+            const entry = d.data[r.id];
+            ts[r.id] = entry?.generated_at ?? null;
+          }
+          setTimestamps(ts);
+        }
+      })
+      .catch(() => {
+        // Fall back to localStorage for offline/error case
+        const ts: Record<string, string | null> = {};
+        for (const r of REPORTS) {
+          ts[r.id] = typeof window !== "undefined"
+            ? localStorage.getItem(`report_generated_${r.id}`)
+            : null;
+        }
+        setTimestamps(ts);
+      });
+  }, []);
 
   async function generateReport(reportId: string) {
     setGenerating(reportId);
@@ -220,8 +229,19 @@ export default function ReportsPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      setStoredTimestamp(reportId);
-      setTimestamps((prev) => ({ ...prev, [reportId]: new Date().toISOString() }));
+      // Persist timestamp to server
+      const now = new Date().toISOString();
+      fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ report_type: reportId }),
+      }).catch(() => {
+        // Fallback: store in localStorage if API fails
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`report_generated_${reportId}`, now);
+        }
+      });
+      setTimestamps((prev) => ({ ...prev, [reportId]: now }));
     } finally {
       setGenerating(null);
     }

@@ -231,6 +231,21 @@ export default function AlertsPage() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          {prefs.email_recipients.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => sendTest("email")}
+              disabled={testing === "email"}
+            >
+              {testing === "email" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              <span className="ml-1.5">Send test email</span>
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -271,6 +286,21 @@ export default function AlertsPage() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          {prefs.webhook_urls.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => sendTest("webhook")}
+              disabled={testing === "webhook"}
+            >
+              {testing === "webhook" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              <span className="ml-1.5">Send test webhook</span>
+            </Button>
+          )}
         </CardContent>
       </Card>
 
