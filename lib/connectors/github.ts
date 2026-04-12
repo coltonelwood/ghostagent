@@ -1,7 +1,14 @@
 import { Octokit } from "@octokit/rest";
 import type { Connector, SyncResult, SyncError, NormalizedAsset } from "../types/platform";
 import type { NexusConnector } from "./base";
-import { detectAIServices, isAIRelated, buildNormalizedAsset } from "./base";
+import {
+  detectAIServices,
+  isAIRelated,
+  buildNormalizedAsset,
+  classifyFilePathContext,
+  looksLikeAIFrameworkRepo,
+  type FilePathContext,
+} from "./base";
 import { withRetry } from "../retry";
 import { logger } from "../logger";
 
@@ -18,6 +25,14 @@ const AI_FILE_PATTERNS = [
 
 const MAX_REPOS = 25;
 const MAX_FILES_PER_REPO = 10;
+/**
+ * Per-repo cap when the repo looks like an AI framework / catalog. The
+ * scanner still reports what it finds, so the user sees we noticed it,
+ * but the number of rows doesn't drown real findings from their other
+ * repos. Ten is the arbitrary minimum that feels like "we looked" and
+ * the maximum that doesn't dominate a summary.
+ */
+const MAX_FILES_PER_FRAMEWORK_REPO = 10;
 
 export class GitHubConnector implements NexusConnector {
   kind = "github" as const;
@@ -47,8 +62,16 @@ export class GitHubConnector implements NexusConnector {
     const assets: NormalizedAsset[] = [];
     const errors: SyncError[] = [];
 
-    // Get repos sorted by recent activity
-    let repos: Array<{ name: string; html_url: string; pushed_at?: string | null; language?: string | null }> = [];
+    // Get repos sorted by recent activity. We pull description + name so the
+    // framework detector has something to chew on.
+    let repos: Array<{
+      name: string;
+      full_name?: string;
+      description?: string | null;
+      html_url: string;
+      pushed_at?: string | null;
+      language?: string | null;
+    }> = [];
     try {
       repos = await withRetry(async () => {
         const { data } = await octokit.rest.repos.listForOrg({
@@ -70,7 +93,19 @@ export class GitHubConnector implements NexusConnector {
 
     for (const repo of repos.slice(0, MAX_REPOS)) {
       try {
-        const repoAssets = await this.scanRepo(octokit, org, repo.name, repo.html_url);
+        const framework = looksLikeAIFrameworkRepo({
+          name: repo.name,
+          full_name: repo.full_name,
+          description: repo.description,
+        });
+        const repoAssets = await this.scanRepo(
+          octokit,
+          org,
+          repo.name,
+          repo.html_url,
+          framework.isFramework,
+          framework.reason,
+        );
         assets.push(...repoAssets);
       } catch (err: unknown) {
         errors.push({
@@ -89,13 +124,16 @@ export class GitHubConnector implements NexusConnector {
     octokit: Octokit,
     org: string,
     repo: string,
-    repoUrl: string
+    _repoUrl: string,
+    isFrameworkRepo: boolean,
+    frameworkReason?: string,
   ): Promise<NormalizedAsset[]> {
     const assets: NormalizedAsset[] = [];
     const foundFiles = new Set<string>();
+    const capForThisRepo = isFrameworkRepo ? MAX_FILES_PER_FRAMEWORK_REPO : MAX_FILES_PER_REPO;
 
     for (const pattern of AI_FILE_PATTERNS) {
-      if (foundFiles.size >= MAX_FILES_PER_REPO) break;
+      if (foundFiles.size >= capForThisRepo) break;
 
       try {
         const results = await withRetry(async () => {
@@ -107,6 +145,7 @@ export class GitHubConnector implements NexusConnector {
         });
 
         for (const item of results) {
+          if (foundFiles.size >= capForThisRepo) break;
           if (foundFiles.has(item.path)) continue;
           foundFiles.add(item.path);
 
@@ -126,6 +165,17 @@ export class GitHubConnector implements NexusConnector {
           const aiServices = detectAIServices(content || item.path);
           if (!isAIRelated(item.path) && !aiServices.length) continue;
 
+          // Path context is the single most important new signal — it
+          // decides whether this finding is a customer-facing feature,
+          // a dev-tooling rules file, a doc, or an internal library.
+          const ctx = classifyFilePathContext(item.path);
+
+          // Skip purely educational paths — they're not operational AI.
+          // We don't even want them as low-severity rows because a
+          // customer's `examples/` folder from a copied tutorial will
+          // create a dozen rows of nothing-burger.
+          if (ctx === "educational") continue;
+
           // Try to get committer email
           let ownerEmail: string | undefined;
           let lastCommitterEmail: string | undefined;
@@ -143,24 +193,33 @@ export class GitHubConnector implements NexusConnector {
             }
           } catch { /* ignore */ }
 
+          // Tags carry human-readable context through to the UI so a
+          // CTO scanning the asset registry can immediately see
+          // "customer-facing" vs "dev tooling" without re-reading paths.
+          const tags = [repo, org, ...contextTags(ctx)];
+          if (isFrameworkRepo) tags.push("framework-internals");
+
           assets.push(
             buildNormalizedAsset({
               externalId: `${org}/${repo}/${item.path}`,
               name: `${repo}/${item.path}`,
-              description: `AI-related file in ${org}/${repo}`,
+              description: buildAssetDescription(org, repo, ctx, isFrameworkRepo),
               kind: inferKind(item.path, content),
               sourceUrl: item.html_url,
-              environment: inferEnv(repo, item.path),
+              environment: inferEnvFromContext(ctx, repo, item.path),
               ownerEmail,
               aiServices,
-              dataClassification: inferDataClassification(content),
-              tags: [repo, org],
+              dataClassification: inferDataClassification(content, ctx, isFrameworkRepo),
+              tags,
               rawMetadata: {
                 org,
                 repo,
                 filePath: item.path,
                 lastCommitterEmail,
                 sha: item.sha,
+                pathContext: ctx,
+                frameworkRepo: isFrameworkRepo,
+                frameworkReason,
               },
             })
           );
@@ -184,18 +243,77 @@ function inferKind(path: string, content: string): NormalizedAsset["kind"] {
   return "unknown";
 }
 
-function inferEnv(repo: string, filePath: string): NormalizedAsset["environment"] {
+/**
+ * Environment inference that prefers path context when we have it.
+ * A user-facing API route is almost always production. Dev tooling is
+ * development. Library internals are ambiguous so we fall back to the
+ * name-based heuristic (which looks for `/prod/`, `/staging/`, etc.).
+ */
+function inferEnvFromContext(
+  ctx: FilePathContext,
+  repo: string,
+  filePath: string,
+): NormalizedAsset["environment"] {
+  if (ctx === "user_facing") return "production";
+  if (ctx === "dev_tooling") return "development";
   if (/prod/i.test(repo) || /prod/i.test(filePath)) return "production";
   if (/stag|staging/i.test(repo) || /staging/i.test(filePath)) return "staging";
   if (/dev|local/i.test(repo)) return "development";
   return "unknown";
 }
 
-function inferDataClassification(content: string): string[] {
+/**
+ * Data-classification inference that degrades signals for dev tooling.
+ * A prompts file that mentions "PHI" as an example shouldn't tag the
+ * finding as PHI-handling. We still respect explicit strings in
+ * user-facing or library code.
+ */
+function inferDataClassification(
+  content: string,
+  ctx: FilePathContext,
+  isFrameworkRepo: boolean,
+): string[] {
+  if (ctx === "dev_tooling" || isFrameworkRepo) return ["internal"];
   const classes: string[] = [];
   if (/pii|personally identifiable|personal data/i.test(content)) classes.push("pii");
   if (/phi|health data|hipaa|medical/i.test(content)) classes.push("phi");
   if (/financial|payment|stripe|credit.?card/i.test(content)) classes.push("financial");
   if (classes.length === 0) classes.push("internal");
   return classes;
+}
+
+function contextTags(ctx: FilePathContext): string[] {
+  switch (ctx) {
+    case "user_facing":
+      return ["customer-facing"];
+    case "dev_tooling":
+      return ["dev-tooling"];
+    case "library_internal":
+      return ["library"];
+    case "educational":
+      return ["educational"];
+    default:
+      return [];
+  }
+}
+
+function buildAssetDescription(
+  org: string,
+  repo: string,
+  ctx: FilePathContext,
+  isFrameworkRepo: boolean,
+): string {
+  if (isFrameworkRepo) {
+    return `AI-related file in ${org}/${repo} — repo looks like an AI framework or catalog, findings reflect library internals rather than operational usage.`;
+  }
+  switch (ctx) {
+    case "user_facing":
+      return `Customer-facing AI touchpoint in ${org}/${repo} — lives in an API route or server handler.`;
+    case "dev_tooling":
+      return `Developer-tooling AI configuration in ${org}/${repo} — rules/prompts file for a coding assistant, not a product feature.`;
+    case "library_internal":
+      return `Internal library code in ${org}/${repo} — shared helper, not a direct customer touchpoint.`;
+    default:
+      return `AI-related file in ${org}/${repo}.`;
+  }
 }

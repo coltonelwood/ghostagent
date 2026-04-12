@@ -434,6 +434,146 @@ export function isAIRelated(text: string): boolean {
   return AI_PATTERNS.some(({ pattern }) => pattern.test(text));
 }
 
+// ==========================================================================
+// File-path context classifier
+// ==========================================================================
+//
+// Where a file lives in a repo tells you more about its risk than what it
+// imports. A file at `apps/web/api/chat/route.ts` that calls OpenAI is a
+// production customer-facing feature. A file at `.cursor/rules.md` with
+// the same OpenAI match is developer tooling. A file at `examples/rag.py`
+// is documentation.
+//
+// The classifier is intentionally conservative — unrecognized paths stay
+// `unknown` so the rest of the pipeline treats them normally.
+// ==========================================================================
+
+export type FilePathContext =
+  | "user_facing"    // API routes, page handlers, pages/app — likely production
+  | "dev_tooling"    // AI coding assistant rules/prompts — not a product feature
+  | "educational"    // examples/cookbook/docs/tutorials — not operational
+  | "library_internal" // internal lib/utils/helpers — hard to judge, treated as unknown env
+  | "unknown";
+
+// User-facing surfaces — common conventions across Next.js, Remix, Fresh,
+// Rails, Django, Laravel, Express, etc. Matches anywhere in the path.
+const USER_FACING_PATH_SIGNALS: RegExp[] = [
+  /(^|\/)(apps?|packages|services)\/[^/]+\/(api|server|routes?|handlers?|controllers?|endpoints?)\//i,
+  /(^|\/)(app|pages|src)\/api\//i,
+  /(^|\/)pages\/api\//i,
+  /(^|\/)src\/routes\//i,
+  /(^|\/)server\/(api|routes?|handlers?)\//i,
+  /(^|\/)functions\//i, // firebase functions, cloudflare workers
+  /(^|\/)worker\//i,
+  /(^|\/)edge\//i,
+  /(^|\/)api\/[^/]+\/route\.(ts|js|tsx|jsx|py|rb)$/i,
+];
+
+// Developer-tooling paths — AI coding assistants, internal prompt libraries.
+// These are NOT customer-facing and should not be treated as operational AI.
+const DEV_TOOLING_PATH_SIGNALS: RegExp[] = [
+  /(^|\/)\.cursor\//i,
+  /(^|\/)\.cursorrules$/i,
+  /(^|\/)\.claude\//i,
+  /(^|\/)\.aider\//i,
+  /(^|\/)\.continue\//i,
+  /(^|\/)\.codeium\//i,
+  /(^|\/)\.github\/copilot/i,
+  /(^|\/)agents\/(rules|skills|commands)/i,
+  /(^|\/)\.ai\//i,
+  /(^|\/)\.vscode\/copilot/i,
+  /(^|\/)prompts\//i,
+];
+
+// Educational / documentation paths. Mirrors the scanner's
+// EDUCATIONAL_PATH_SIGNALS but kept local so the connector doesn't have
+// to import from lib/scanner (different subsystem).
+const EDUCATIONAL_PATH_SIGNALS_CONNECTOR: RegExp[] = [
+  /^docs?\//i,
+  /\/docs?\//i,
+  /^examples?\//i,
+  /\/examples?\//i,
+  /^cookbook\//i,
+  /\/cookbook\//i,
+  /^tutorials?\//i,
+  /\/tutorials?\//i,
+  /^demos?\//i,
+  /\/demos?\//i,
+  /^samples?\//i,
+  /\/samples?\//i,
+  /^quickstart\//i,
+  /\/quickstart\//i,
+  /\.ipynb$/i,
+  /README(\.\w+)?$/,
+];
+
+const LIBRARY_INTERNAL_PATH_SIGNALS: RegExp[] = [
+  /(^|\/)(lib|libs|utils?|helpers?|shared|common|core|internal)\//i,
+  /(^|\/)src\/(lib|libs|utils?|helpers?|shared|common|core)\//i,
+];
+
+/**
+ * Classify a file path into a "context" that tells downstream risk
+ * logic what kind of location this finding lives in. Ordering matters:
+ * we check dev_tooling and educational FIRST so a file like
+ * `.cursor/rules/api.md` isn't mistaken for a user_facing API route.
+ */
+export function classifyFilePathContext(filePath: string): FilePathContext {
+  if (DEV_TOOLING_PATH_SIGNALS.some((p) => p.test(filePath))) return "dev_tooling";
+  if (EDUCATIONAL_PATH_SIGNALS_CONNECTOR.some((p) => p.test(filePath))) return "educational";
+  if (USER_FACING_PATH_SIGNALS.some((p) => p.test(filePath))) return "user_facing";
+  if (LIBRARY_INTERNAL_PATH_SIGNALS.some((p) => p.test(filePath))) return "library_internal";
+  return "unknown";
+}
+
+/**
+ * Lightweight framework/catalog repo detector. Mirrors the heavier
+ * version in lib/scanner/detection-classes.ts but kept here so the
+ * connector path doesn't need to import from the scanner path (they're
+ * independent subsystems). Conservative — if in doubt, return false and
+ * let the normal flow handle it.
+ */
+export function looksLikeAIFrameworkRepo(repo: {
+  name?: string;
+  full_name?: string;
+  description?: string | null;
+}): { isFramework: boolean; reason?: string } {
+  const name = (repo.name ?? "").toLowerCase();
+  const fullName = (repo.full_name ?? "").toLowerCase();
+  const desc = (repo.description ?? "").toLowerCase();
+
+  const framePatterns: RegExp[] = [
+    /\blangchain\b/,
+    /\blanggraph\b/,
+    /\blangflow\b/,
+    /\bllamaindex\b/,
+    /\bhaystack\b/,
+    /\bautogen\b/,
+    /\bcrewai\b/,
+    /\bauto[-_]?gpt\b/,
+    /\b(awesome|best)[-_](llm|ai|agent|ml)\b/,
+    /\bopenai[-_](cookbook|python|node|agents|sdk)\b/,
+    /^llm[-_]/,
+    /[-_]llm$/,
+  ];
+  for (const p of framePatterns) {
+    if (p.test(name) || p.test(fullName)) {
+      return { isFramework: true, reason: "Repository name matches a known AI framework pattern." };
+    }
+  }
+
+  if (/\b(framework|library|sdk|toolkit)\b.*\b(ai|llm|agent)\b/.test(desc) ||
+      /\b(ai|llm|agent)\b.*\b(framework|library|sdk|toolkit)\b/.test(desc) ||
+      /awesome list|curated (list|collection)|cookbook|examples? and tutorials?/.test(desc)) {
+    return {
+      isFramework: true,
+      reason: "Repository description indicates it is an AI framework, library, or educational collection.",
+    };
+  }
+
+  return { isFramework: false };
+}
+
 export function buildNormalizedAsset(overrides: Partial<NormalizedAsset> & Pick<NormalizedAsset, "externalId" | "name">): NormalizedAsset {
   return {
     description: undefined,
