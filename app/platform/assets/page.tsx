@@ -80,8 +80,21 @@ const STATUS_OPTIONS = [
   { value: "archived", label: "Archived" },
 ];
 
+const KIND_OPTIONS = [
+  { value: "agent", label: "Agent" },
+  { value: "pipeline", label: "Pipeline" },
+  { value: "workflow", label: "Workflow" },
+  { value: "function", label: "Function" },
+  { value: "script", label: "Script" },
+  { value: "model", label: "Model" },
+  { value: "integration", label: "Integration" },
+  { value: "api", label: "API" },
+  { value: "sdk_reported", label: "SDK Reported" },
+];
+
 const SAVED_VIEWS = [
   { id: "all", label: "All assets" },
+  { id: "agents", label: "Agents" },
   { id: "critical", label: "Critical & high" },
   { id: "orphaned", label: "Orphaned" },
   { id: "production", label: "Production" },
@@ -192,6 +205,7 @@ export default function AssetsPage() {
   const [risk, setRisk] = useState<string[]>([]);
   const [owner, setOwner] = useState<string[]>([]);
   const [status, setStatus] = useState<string[]>([]);
+  const [kind, setKind] = useState<string[]>([]);
   const [activeView, setActiveView] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -201,8 +215,10 @@ export default function AssetsPage() {
     setRisk([]);
     setOwner([]);
     setStatus([]);
+    setKind([]);
     setPage(1);
-    if (id === "critical") setRisk(["critical", "high"]);
+    if (id === "agents") setKind(["agent"]);
+    else if (id === "critical") setRisk(["critical", "high"]);
     else if (id === "orphaned") setOwner(["orphaned"]);
     else if (id === "production") setStatus(["active"]);
   }
@@ -215,6 +231,7 @@ export default function AssetsPage() {
     if (risk.length) params.set("risk_level", risk.join(","));
     if (owner.length) params.set("owner_status", owner.join(","));
     if (status.length) params.set("status", status.join(","));
+    if (kind.length) params.set("kind", kind.join(","));
 
     try {
       const res = await fetch(`/api/assets?${params}`);
@@ -229,7 +246,7 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sources, risk, owner, status]);
+  }, [page, search, sources, risk, owner, status, kind]);
 
   useEffect(() => {
     fetchAssets();
@@ -237,7 +254,7 @@ export default function AssetsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, sources, risk, owner, status]);
+  }, [search, sources, risk, owner, status, kind]);
 
   function toggleRow(id: string) {
     setSelected((prev) => {
@@ -387,6 +404,12 @@ export default function AssetsPage() {
               options={OWNER_OPTIONS}
               selected={owner}
               onChange={setOwner}
+            />
+            <FacetDropdown
+              label="Type"
+              options={KIND_OPTIONS}
+              selected={kind}
+              onChange={setKind}
             />
             <FacetDropdown
               label="Status"
