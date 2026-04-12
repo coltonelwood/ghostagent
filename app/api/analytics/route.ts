@@ -30,12 +30,14 @@ export const GET = withLogging(async () => {
     connectorsRes,
     eventsRes,
     frameworksRes,
+    topRiskRes,
   ] = await Promise.all([
-    db.from("assets").select("id, kind, risk_level, owner_status, source, status, environment").eq("org_id", org.id),
+    db.from("assets").select("id, kind, risk_level, owner_status, source, status, environment, data_classification").eq("org_id", org.id),
     db.from("policy_violations").select("severity, status").eq("org_id", org.id).eq("status", "open"),
     db.from("connectors").select("id, status, kind, last_sync_at").eq("org_id", org.id).neq("status", "disconnected"),
     db.from("events").select("id, kind, severity, title, created_at, asset_id").eq("org_id", org.id).order("created_at", { ascending: false }).limit(10),
     db.from("compliance_frameworks").select("id, code, enabled").eq("enabled", true),
+    db.from("assets").select("id, name, kind, risk_level, risk_score, owner_email, owner_status, source, environment, description").eq("org_id", org.id).eq("status", "active").order("risk_score", { ascending: false }).limit(5),
   ]);
 
   const assets = assetsRes.data ?? [];
@@ -51,6 +53,8 @@ export const GET = withLogging(async () => {
 
   let orphanedAssets = 0;
   let criticalAssets = 0;
+  let sensitiveDataAssets = 0;
+  const sensitiveLabels = new Set(["pii", "phi", "financial"]);
 
   for (const a of assets) {
     if (a.status !== "active") continue;
@@ -59,6 +63,8 @@ export const GET = withLogging(async () => {
     if (a.risk_level) assetsByRiskLevel[a.risk_level] = (assetsByRiskLevel[a.risk_level] ?? 0) + 1;
     if (a.owner_status === "orphaned") orphanedAssets++;
     if (a.risk_level === "critical") criticalAssets++;
+    const dc = a.data_classification as string[] | null;
+    if (dc?.some((c: string) => sensitiveLabels.has(c))) sensitiveDataAssets++;
   }
 
   const openViolations = violations.length;
@@ -93,7 +99,9 @@ export const GET = withLogging(async () => {
       criticalAssets,
       connectorCount,
       connectorsByStatus,
+      sensitiveDataAssets,
       recentEvents: eventsRes.data ?? [],
+      topRiskAssets: topRiskRes.data ?? [],
       complianceScore,
     },
   });
