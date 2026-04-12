@@ -41,6 +41,11 @@ export default async function AssetDetailPage({
       cache: "no-store",
     });
 
+    // Session expired mid-navigation — send the user back through auth
+    // instead of flashing a confusing 404.
+    if (res.status === 401 || res.status === 403) {
+      redirect(`/auth/login?redirectTo=${encodeURIComponent(`/platform/assets/${id}`)}`);
+    }
     if (!res.ok) {
       if (res.status === 404) notFound();
       fetchError = true;

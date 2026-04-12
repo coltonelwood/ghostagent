@@ -19,11 +19,18 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const RISK_COLORS: Record<string, string> = {
-  critical: "bg-red-100 text-red-800 border-red-200",
-  high:     "bg-orange-100 text-orange-800 border-orange-200",
-  medium:   "bg-yellow-100 text-yellow-800 border-yellow-200",
-  low:      "bg-green-100 text-green-800 border-green-200",
+const RISK_BADGE_CLASS: Record<string, string> = {
+  critical: "bg-destructive/10 text-destructive border-destructive/20",
+  high:     "bg-warning/10 text-warning border-warning/20",
+  medium:   "bg-info/10 text-info border-info/20",
+  low:      "bg-success/10 text-success border-success/20",
+};
+
+const RISK_SCORE_TEXT: Record<string, string> = {
+  critical: "text-destructive",
+  high:     "text-warning",
+  medium:   "text-info",
+  low:      "text-success",
 };
 
 const OWNER_STATUS_LABELS: Record<string, string> = {
@@ -66,6 +73,17 @@ function MetadataRow({ label, value }: { label: string; value: React.ReactNode }
       <span className="text-sm text-right">{value}</span>
     </div>
   );
+}
+
+function formatDate(iso: string | null | undefined): React.ReactNode {
+  if (!iso) return <span className="text-muted-foreground">—</span>;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return <span className="text-muted-foreground">—</span>;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
@@ -152,7 +170,7 @@ export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold border capitalize ${RISK_COLORS[asset.risk_level] ?? ""}`}>
+            <span className={`inline-flex items-center rounded-sm px-2.5 py-1 text-xs font-semibold border capitalize ${RISK_BADGE_CLASS[asset.risk_level] ?? "border-border text-muted-foreground"}`}>
               {asset.risk_level} risk
             </span>
             <Badge variant="outline" className="capitalize">{asset.kind}</Badge>
@@ -228,12 +246,8 @@ export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
                 <MetadataRow label="Review status" value={
                   <span className="capitalize">{asset.review_status.replace(/_/g, " ")}</span>
                 } />
-                <MetadataRow label="First seen" value={
-                  new Date(asset.first_seen_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                } />
-                <MetadataRow label="Last seen" value={
-                  new Date(asset.last_seen_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                } />
+                <MetadataRow label="First seen" value={formatDate(asset.first_seen_at)} />
+                <MetadataRow label="Last seen" value={formatDate(asset.last_seen_at)} />
                 {asset.source_url && (
                   <MetadataRow label="Source link" value={
                     <a href={asset.source_url} target="_blank" rel="noopener noreferrer"
@@ -323,7 +337,7 @@ export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm">Risk Score Breakdown</CardTitle>
-                <span className={`text-2xl font-bold ${RISK_COLORS[asset.risk_level] ? "text-" + asset.risk_level + "-600" : ""}`}>
+                <span className={`text-2xl font-bold nx-tabular ${RISK_SCORE_TEXT[asset.risk_level] ?? "text-muted-foreground"}`}>
                   {asset.risk_score}/100
                 </span>
               </div>

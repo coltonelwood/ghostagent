@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -71,24 +71,79 @@ const SYNC_STATUS_ICON: Record<string, React.ReactNode> = {
 
 export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
   const router = useRouter();
-  const [syncing, setSyncing] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  // Optimistic "just clicked Sync Now" flag — cleared once the server
+  // reports a running sync or 5s passes (whichever comes first). The
+  // canonical in-flight state is the server's most recent sync record.
+  const [justClicked, setJustClicked] = useState(false);
+  const toastedSyncIds = useRef<Set<string>>(new Set());
+  // Only toast about syncs the user initiated from this session.
+  const userInitiatedSession = useRef(false);
+
+  const latestSync = connector.syncs[0];
+  const serverRunning = latestSync?.status === "running";
+  const inFlight = serverRunning || justClicked;
+
+  // Expire the optimistic flag after 5 seconds as a safety net. By then
+  // either a running sync has shown up on the server (which keeps the
+  // banner visible anyway) or something went wrong and we stop claiming
+  // it's in-flight.
+  useEffect(() => {
+    if (!justClicked) return;
+    const t = setTimeout(() => setJustClicked(false), 5000);
+    return () => clearTimeout(t);
+  }, [justClicked]);
+
+  // Poll every 3s while the server reports a running sync.
+  const refreshFromServer = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  useEffect(() => {
+    if (!serverRunning) return;
+    const interval = setInterval(refreshFromServer, 3000);
+    return () => clearInterval(interval);
+  }, [serverRunning, refreshFromServer]);
+
+  // Toast on completion / failure, once per sync id, only if the user
+  // initiated the sync from this page load.
+  useEffect(() => {
+    if (!userInitiatedSession.current) return;
+    if (!latestSync) return;
+    if (latestSync.status === "running") return;
+    if (toastedSyncIds.current.has(latestSync.id)) return;
+    toastedSyncIds.current.add(latestSync.id);
+    if (latestSync.status === "completed") {
+      toast.success(
+        `Sync complete — ${latestSync.assets_found ?? 0} asset${
+          (latestSync.assets_found ?? 0) === 1 ? "" : "s"
+        } found`,
+      );
+    } else if (latestSync.status === "failed") {
+      toast.error(
+        latestSync.error ?? "Sync failed — check credentials and try again.",
+      );
+    }
+  }, [latestSync]);
 
   const handleSync = async () => {
-    setSyncing(true);
+    userInitiatedSession.current = true;
+    setJustClicked(true);
     try {
-      const res = await fetch(`/api/connectors/${connector.id}/sync`, { method: "POST" });
+      const res = await fetch(`/api/connectors/${connector.id}/sync`, {
+        method: "POST",
+      });
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error ?? "Failed to start sync");
-      } else {
-        toast.success("Sync started — results will appear shortly");
-        setTimeout(() => router.refresh(), 3000);
+        setJustClicked(false);
+        return;
       }
+      toast.success("Sync started — results will appear shortly");
+      setTimeout(() => router.refresh(), 1500);
     } catch {
       toast.error("Failed to start sync. Please try again.");
-    } finally {
-      setSyncing(false);
+      setJustClicked(false);
     }
   };
 
@@ -143,6 +198,12 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
             {!connector.enabled && (
               <Badge variant="outline">Disabled</Badge>
             )}
+            {inFlight && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm border border-info/20 bg-info/10 px-1.5 py-0.5 text-[11px] font-medium text-info">
+                <RefreshCw className="size-3 animate-spin" />
+                Syncing
+              </span>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -150,12 +211,12 @@ export function ConnectorDetail({ connector }: { connector: ConnectorData }) {
             variant="outline"
             size="sm"
             onClick={handleSync}
-            disabled={syncing}
+            disabled={inFlight}
           >
             <RefreshCw
-              className={`size-4 ${syncing ? "animate-spin" : ""}`}
+              className={`size-4 ${inFlight ? "animate-spin" : ""}`}
             />
-            {syncing ? "Syncing..." : "Sync Now"}
+            {inFlight ? "Syncing..." : "Sync Now"}
           </Button>
           <Dialog>
             <DialogTrigger

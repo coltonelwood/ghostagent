@@ -41,6 +41,9 @@ export default async function ConnectorDetailPage({
       cache: "no-store",
     });
 
+    if (res.status === 401 || res.status === 403) {
+      redirect(`/auth/login?redirectTo=${encodeURIComponent(`/platform/connectors/${id}`)}`);
+    }
     if (!res.ok) {
       if (res.status === 404) notFound();
       fetchError = true;
