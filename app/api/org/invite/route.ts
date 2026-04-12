@@ -94,12 +94,12 @@ export const POST = withLogging(async (req: NextRequest) => {
 
   // Send invitation email via Resend
   if (process.env.RESEND_API_KEY && invitation?.token) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://nexus.ai';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://spekris.ai';
     const inviteUrl = `${appUrl}/invite?token=${invitation.token}`;
     const html = `<div style="font-family:sans-serif;max-width:600px">
-      <h2 style="color:#0f172a">You've been invited to join ${org.name} on Nexus</h2>
+      <h2 style="color:#0f172a">You've been invited to join ${org.name} on Spekris</h2>
       <p>${user.email} has invited you to join their AI governance workspace as a <strong>${body.role}</strong>.</p>
-      <p>Nexus helps teams discover, monitor, and govern AI systems across your organization.</p>
+      <p>Spekris helps teams discover, monitor, and govern AI systems across your organization.</p>
       <a href="${inviteUrl}" style="display:inline-block;background:#0f172a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">Accept Invitation</a>
       <p style="color:#6b7280;font-size:12px">This invitation expires in 7 days. If you didn't expect this, you can safely ignore it.</p>
     </div>`;
@@ -111,9 +111,9 @@ export const POST = withLogging(async (req: NextRequest) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Nexus <noreply@nexus.ai>",
+        from: "Spekris <noreply@spekris.ai>",
         to: [body.email],
-        subject: `You've been invited to ${org.name} on Nexus`,
+        subject: `You've been invited to ${org.name} on Spekris`,
         html,
       }),
     }).catch(() => { /* Non-critical — invitation still saved */ });

@@ -273,7 +273,7 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Asset registry"
-        description="Every AI system Nexus has discovered across your connected sources."
+        description="Every AI system Spekris has discovered across your connected sources."
         meta={
           total > 0 && (
             <>

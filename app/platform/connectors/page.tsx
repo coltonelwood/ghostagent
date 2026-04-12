@@ -251,7 +251,7 @@ export default function ConnectorsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Connectors"
-        description="Link sources so Nexus can discover, classify, and monitor every AI system in your stack."
+        description="Link sources so Spekris can discover, classify, and monitor every AI system in your stack."
         meta={
           connectors.length > 0 && (
             <>

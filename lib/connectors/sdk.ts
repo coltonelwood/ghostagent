@@ -10,7 +10,7 @@ import { logger } from "../logger";
 export class SDKConnector implements NexusConnector {
   kind = "sdk" as const;
   displayName = "Internal SDK";
-  description = "Self-report AI systems from your own codebase using the Nexus SDK";
+  description = "Self-report AI systems from your own codebase using the Spekris SDK";
   category = "internal" as const;
   icon = "code";
 

@@ -320,7 +320,7 @@ export default function ConnectorSetupPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Nexus will attempt a live connection to {definition.displayName} using the credentials you provided. If it fails, nothing will be saved.
+              Spekris will attempt a live connection to {definition.displayName} using the credentials you provided. If it fails, nothing will be saved.
             </p>
             {testResult.status === "idle" && (
               <Button onClick={handleTestConnection}>
