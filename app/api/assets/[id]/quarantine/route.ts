@@ -10,7 +10,7 @@ import { apiRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export const POST = withLogging(
+const handler = withLogging(
   async (req: NextRequest, ctx: unknown) => {
     try {
       const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
@@ -137,3 +137,6 @@ export const POST = withLogging(
     }
   },
 );
+
+export const POST = handler;
+export const PATCH = handler;
