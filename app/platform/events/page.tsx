@@ -217,7 +217,7 @@ export default function EventsPage() {
             <EmptyState
               icon={Bell}
               title="No events yet"
-              description="Events appear here as Nexus discovers assets, runs policies, and observes ownership changes."
+              description="Events appear here as Spekris discovers assets, runs policies, and observes ownership changes."
             />
           )}
         </div>

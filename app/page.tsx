@@ -66,7 +66,7 @@ const STEPS = [
   {
     n: "02",
     title: "Discover AI systems",
-    body: "Nexus scans connected sources for LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services.",
+    body: "Spekris scans connected sources for LLM integrations, ML models, automation workflows, AI feature flags, and internal scoring services.",
   },
   {
     n: "03",
@@ -84,7 +84,7 @@ const MODULES = [
   {
     icon: Database,
     title: "Asset registry",
-    body: "Every AI system Nexus discovers, with ownership, risk score, environment, and compliance tags.",
+    body: "Every AI system Spekris discovers, with ownership, risk score, environment, and compliance tags.",
   },
   {
     icon: Activity,
@@ -122,13 +122,13 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Nexus and had a structured report to share in under an hour. That conversation went a lot better than it would have otherwise.",
+      "When our SOC 2 auditor asked for an AI system inventory, we had nothing. We ran Spekris and had a structured report to share in under an hour. That conversation went a lot better than it would have otherwise.",
     name: "Head of Security",
     co: "Healthcare SaaS, 120 employees",
   },
   {
     quote:
-      "We had a spreadsheet. It was always out of date. Now Nexus just updates it automatically whenever a new AI integration gets pushed.",
+      "We had a spreadsheet. It was always out of date. Now Spekris just updates it automatically whenever a new AI integration gets pushed.",
     name: "Engineering Manager",
     co: "Legal tech platform, 90 engineers",
   },
@@ -198,7 +198,7 @@ function ProductScreenshot() {
         <div className="size-2 rounded-full bg-warning/60" />
         <div className="size-2 rounded-full bg-success/60" />
         <div className="mx-auto rounded-sm bg-muted px-3 py-0.5 font-mono text-[10px] text-muted-foreground">
-          app.nexus.io / platform
+          app.spekris.io / platform
         </div>
       </div>
 
@@ -323,10 +323,10 @@ export default function LandingPage() {
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 items-center justify-center rounded bg-primary">
               <span className="text-xs font-semibold text-primary-foreground">
-                N
+                S
               </span>
             </div>
-            <span className="text-[15px] font-semibold tracking-tight">Nexus</span>
+            <span className="text-[15px] font-semibold tracking-tight">Spekris</span>
           </div>
 
           <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
@@ -380,7 +380,7 @@ export default function LandingPage() {
               Know every AI system running inside your company.
             </h1>
             <p className="max-w-xl text-base text-muted-foreground leading-relaxed">
-              Nexus scans your code, cloud, and automation stack to surface AI
+              Spekris scans your code, cloud, and automation stack to surface AI
               agents, LLM integrations, and ML services — then assigns ownership,
               scores risk, and maps findings to the compliance frameworks your
               auditors care about.
@@ -589,9 +589,9 @@ export default function LandingPage() {
             Evidence for the frameworks your auditors actually ask about.
           </h2>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            Nexus maps findings to specific controls across four frameworks so
+            Spekris maps findings to specific controls across four frameworks so
             you can hand structured evidence to your security team or your
-            assessor. Nexus does not certify compliance — it helps you prepare.
+            assessor. Spekris does not certify compliance — it helps you prepare.
           </p>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2">
@@ -796,10 +796,10 @@ export default function LandingPage() {
           <div className="flex items-center gap-2.5">
             <div className="flex size-6 items-center justify-center rounded bg-primary">
               <span className="text-[10px] font-semibold text-primary-foreground">
-                N
+                S
               </span>
             </div>
-            <span className="text-sm font-semibold">Nexus</span>
+            <span className="text-sm font-semibold">Spekris</span>
             <span className="text-muted-foreground/60">·</span>
             <span className="text-xs text-muted-foreground">
               AI Asset Management
@@ -817,7 +817,7 @@ export default function LandingPage() {
             </a>
           </nav>
           <p className="text-xs text-muted-foreground/70">
-            © 2026 Nexus. All rights reserved.
+            © 2026 Spekris. All rights reserved.
           </p>
         </div>
       </footer>

@@ -160,10 +160,10 @@ export default function DemoPage() {
             <div className="flex items-center gap-2">
               <div className="flex size-6 items-center justify-center rounded bg-primary">
                 <span className="text-[10px] font-semibold text-primary-foreground">
-                  N
+                  S
                 </span>
               </div>
-              <span className="text-sm font-semibold">Nexus</span>
+              <span className="text-sm font-semibold">Spekris</span>
               <span className="ml-1 inline-flex h-5 items-center rounded-sm border border-border bg-muted/40 px-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
                 Sample scan
               </span>
@@ -182,7 +182,7 @@ export default function DemoPage() {
       <div className="mx-auto max-w-6xl px-6 py-8">
         <PageHeader
           title="AI asset inventory — acme-corp"
-          description="18 repositories scanned. 5 AI systems discovered across code and ML services. This is a sample — sign in to run Nexus on your own organization."
+          description="18 repositories scanned. 5 AI systems discovered across code and ML services. This is a sample — sign in to run Spekris on your own organization."
           meta={
             <>
               <span className="nx-tabular">4m 12s</span>
@@ -373,7 +373,7 @@ export default function DemoPage() {
             These findings are from a fictional company.
           </h2>
           <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-muted-foreground">
-            Connect your own sources and Nexus will run the same scan on your
+            Connect your own sources and Spekris will run the same scan on your
             real code, cloud, and automations. First scan takes under five
             minutes. No agent to install.
           </p>
@@ -389,7 +389,7 @@ export default function DemoPage() {
               href="/"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              Learn more about Nexus
+              Learn more about Spekris
             </Link>
           </div>
           <p className="mt-4 text-[11px] text-muted-foreground/70">

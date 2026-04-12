@@ -99,10 +99,10 @@ function LoginInner() {
           <div className="flex items-center gap-2">
             <div className="flex size-6 items-center justify-center rounded bg-primary">
               <span className="text-[10px] font-semibold text-primary-foreground">
-                N
+                S
               </span>
             </div>
-            <span className="text-sm font-semibold">Nexus</span>
+            <span className="text-sm font-semibold">Spekris</span>
           </div>
         </div>
       </header>
@@ -139,7 +139,7 @@ function LoginInner() {
             <>
               <div className="mb-8 text-center">
                 <h1 className="text-xl font-semibold tracking-tight">
-                  Sign in to Nexus
+                  Sign in to Spekris
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Enter your work email. We&apos;ll send you a secure sign-in link.
@@ -195,7 +195,7 @@ function LoginInner() {
               </div>
 
               <p className="mt-6 text-center text-xs text-muted-foreground">
-                New to Nexus?{" "}
+                New to Spekris?{" "}
                 <Link
                   href="/"
                   className="font-medium text-foreground hover:underline"

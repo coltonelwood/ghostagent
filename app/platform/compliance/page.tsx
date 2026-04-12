@@ -158,7 +158,7 @@ export default function CompliancePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `nexus-compliance-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `spekris-compliance-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -187,7 +187,7 @@ export default function CompliancePage() {
     <div className="space-y-6">
       <PageHeader
         title="Compliance"
-        description="Map your AI asset inventory to the frameworks your auditors care about. Nexus provides evidence — it does not certify compliance."
+        description="Map your AI asset inventory to the frameworks your auditors care about. Spekris provides evidence — it does not certify compliance."
         secondaryActions={
           <Button variant="outline" size="sm" onClick={downloadReport}>
             <Download className="size-3.5" />
@@ -385,7 +385,7 @@ export default function CompliancePage() {
       </div>
 
       <p className="text-[11px] text-muted-foreground/70">
-        Nexus provides structured evidence to support your compliance efforts.
+        Spekris provides structured evidence to support your compliance efforts.
         It is not a substitute for a qualified auditor or legal counsel.
       </p>
     </div>

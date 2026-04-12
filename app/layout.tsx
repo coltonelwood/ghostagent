@@ -3,9 +3,9 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nexus — AI Asset Management for Modern Companies",
+  title: "Spekris — AI Asset Management for Modern Companies",
   description:
-    "Nexus scans connected sources for AI agents, LLM integrations, and automation workflows — then assigns ownership, scores risk, and maps findings to HIPAA, SOC 2, EU AI Act, and ISO 42001 controls.",
+    "Spekris scans connected sources for AI agents, LLM integrations, and automation workflows — then assigns ownership, scores risk, and maps findings to HIPAA, SOC 2, EU AI Act, and ISO 42001 controls.",
 };
 
 export default function RootLayout({

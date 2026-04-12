@@ -137,7 +137,7 @@ export default function OrgSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Use this key to report AI assets from your internal systems using the Nexus SDK.
+            Use this key to report AI assets from your internal systems using the Spekris SDK.
           </p>
           <div className="flex gap-2">
             <Input

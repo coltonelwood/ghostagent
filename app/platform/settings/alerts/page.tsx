@@ -130,7 +130,7 @@ export default function AlertsPage() {
       <div>
         <h1 className="text-2xl font-bold">Alert Preferences</h1>
         <p className="text-muted-foreground mt-1">
-          Configure how and where Nexus sends alerts
+          Configure how and where Spekris sends alerts
         </p>
       </div>
 
@@ -158,7 +158,7 @@ export default function AlertsPage() {
               onChange={(e) =>
                 setPrefs({ ...prefs, slack_channel: e.target.value || null })
               }
-              placeholder="#nexus-alerts"
+              placeholder="#spekris-alerts"
             />
           </div>
         </CardContent>
@@ -203,7 +203,7 @@ export default function AlertsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            Nexus will POST a signed JSON payload to these URLs for each event.
+            Spekris will POST a signed JSON payload to these URLs for each event.
           </p>
           {prefs.webhook_urls.map((url) => (
             <div key={url} className="flex items-center gap-2">
@@ -226,7 +226,7 @@ export default function AlertsPage() {
               type="url"
               value={newWebhook}
               onChange={(e) => setNewWebhook(e.target.value)}
-              placeholder="https://your-system.com/hooks/nexus"
+              placeholder="https://your-system.com/hooks/spekris"
               onKeyDown={(e) => e.key === "Enter" && addWebhook()}
             />
             <Button variant="outline" size="sm" onClick={addWebhook}>

@@ -39,9 +39,9 @@ export function DashboardShell({
           <div className="flex items-center gap-6">
             <Link href="/platform" className="flex items-center gap-2">
               <div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-600">
-                <span className="text-xs font-bold text-white">N</span>
+                <span className="text-xs font-bold text-white">S</span>
               </div>
-              <span className="font-semibold text-sm">Nexus</span>
+              <span className="font-semibold text-sm">Spekris</span>
             </Link>
 
             <nav className="hidden items-center gap-0.5 md:flex">
