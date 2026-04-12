@@ -383,7 +383,7 @@ export const CONNECTOR_DEFINITIONS: ConnectorDefinition[] = [
   {
     kind: "sdk",
     displayName: "Internal SDK",
-    description: "Self-report AI systems from your own codebase using the Nexus SDK",
+    description: "Self-report AI systems from your own codebase using the Spekris SDK",
     category: "internal",
     icon: "code",
     authType: "token",

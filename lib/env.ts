@@ -75,7 +75,7 @@ function validateShapes(): EnvProblem[] {
       ) {
         problems.push({
           key: "NEXT_PUBLIC_APP_URL",
-          reason: `points at ${parsed.hostname} in production — set it to your real domain (e.g. https://nexus.yourcompany.com).`,
+          reason: `points at ${parsed.hostname} in production — set it to your real domain (e.g. https://spekris.yourcompany.com).`,
         });
       }
       if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:") {
@@ -136,7 +136,7 @@ export function validateEnv(): void {
     if (process.env.NODE_ENV === "production") {
       // In production we refuse to start — better than silent drift.
       throw new Error(
-        `Nexus cannot start with invalid environment:\n  - ${msg}`,
+        `Spekris cannot start with invalid environment:\n  - ${msg}`,
       );
     } else {
       console.warn(

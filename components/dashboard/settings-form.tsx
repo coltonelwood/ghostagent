@@ -86,7 +86,7 @@ export function SettingsForm({ workspace }: { workspace: Workspace }) {
           <div className="flex items-center justify-between">
             <label htmlFor="github_token" className="text-sm font-medium">Personal access token</label>
             <a
-              href="https://github.com/settings/tokens/new?scopes=repo,read:org&description=Nexus+Scanner"
+              href="https://github.com/settings/tokens/new?scopes=repo,read:org&description=Spekris+Scanner"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

@@ -26,7 +26,7 @@ export class SlackConnector implements NexusConnector {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: "Nexus connector validation: Slack webhook is working.",
+          text: "Spekris connector validation: Slack webhook is working.",
         }),
       });
 
