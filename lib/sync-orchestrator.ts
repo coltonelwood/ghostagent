@@ -4,6 +4,7 @@ import { decryptCredentials } from "./crypto";
 import { scoreAsset, buildRiskContext } from "./risk-engine";
 import { resolveOwnership, shouldMarkOrphaned } from "./ownership-engine";
 import { runPoliciesForOrg } from "./policy-engine";
+import { autoMapCompliance } from "./compliance/auto-mapper";
 import { emitEvent } from "./event-system";
 import { getPlanLimits } from "./entitlements";
 import { getOrgAssetCount } from "./org";
@@ -133,6 +134,7 @@ export async function syncConnector(connectorId: string): Promise<{success:boole
     if (newIds.length) {
       await runPoliciesForOrg(connector.org_id, newIds).catch((e:unknown)=>logger.error({e},"policy engine error"));
     }
+    await autoMapCompliance(connector.org_id).catch((e:unknown)=>logger.error({e},"compliance auto-map error"));
     const processed = assets.length;
     const body = truncated > 0
       ? `Found ${syncResult.assets.length} AI assets. Processed the first ${processed} — raise your plan limit to scan the rest.`
