@@ -7,6 +7,7 @@ import { runPoliciesForOrg } from "./policy-engine";
 import { emitEvent } from "./event-system";
 import { getPlanLimits } from "./entitlements";
 import { getOrgAssetCount } from "./org";
+import { cronToIntervalMs } from "./cron-utils";
 import { logger } from "./logger";
 import type {
   Asset,
@@ -228,16 +229,24 @@ async function getHREmployees(orgId: string): Promise<HREmployee[]> {
 }
 
 export async function scheduleOrgSyncs(orgId?: string): Promise<number> {
-  let q = adminClient.from("connectors").select("id,org_id,last_sync_at").eq("enabled",true).neq("status","disconnected");
-  if (orgId) q = q.eq("org_id",orgId);
-  const {data:connectors} = await q;
+  let q = adminClient
+    .from("connectors")
+    .select("id,org_id,last_sync_at,sync_schedule")
+    .eq("enabled", true)
+    .neq("status", "disconnected");
+  if (orgId) q = q.eq("org_id", orgId);
+  const { data: connectors } = await q;
   if (!connectors?.length) return 0;
-  const sixHAgo = new Date(Date.now()-6*60*60*1000);
-  let queued=0;
+
+  const now = Date.now();
+  let queued = 0;
   for (const c of connectors) {
-    const last = c.last_sync_at ? new Date(c.last_sync_at) : null;
-    if (!last||last<sixHAgo) {
-      syncConnector(c.id).catch((e:unknown)=>logger.error({connectorId:c.id,e},"bg sync failed"));
+    const intervalMs = cronToIntervalMs(c.sync_schedule);
+    const last = c.last_sync_at ? new Date(c.last_sync_at).getTime() : 0;
+    if (now - last >= intervalMs) {
+      syncConnector(c.id).catch((e: unknown) =>
+        logger.error({ connectorId: c.id, e }, "bg sync failed"),
+      );
       queued++;
     }
   }

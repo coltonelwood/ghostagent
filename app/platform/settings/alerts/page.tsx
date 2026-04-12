@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,28 @@ export default function AlertsPage() {
   const [saved, setSaved] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newWebhook, setNewWebhook] = useState("");
+  const [testing, setTesting] = useState<string | null>(null);
+
+  async function sendTest(channel: "slack" | "email" | "webhook") {
+    setTesting(channel);
+    try {
+      const res = await fetch("/api/org/alerts/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        toast.error(d.error ?? "Test failed");
+      } else {
+        toast.success(d.message ?? "Test sent successfully");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setTesting(null);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/org/alerts")
@@ -142,14 +164,30 @@ export default function AlertsPage() {
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
             <Label>Webhook URL</Label>
-            <Input
-              type="url"
-              value={prefs.slack_webhook_url ?? ""}
-              onChange={(e) =>
-                setPrefs({ ...prefs, slack_webhook_url: e.target.value || null })
-              }
-              placeholder="https://hooks.slack.com/services/..."
-            />
+            <div className="flex gap-2">
+              <Input
+                type="url"
+                value={prefs.slack_webhook_url ?? ""}
+                onChange={(e) =>
+                  setPrefs({ ...prefs, slack_webhook_url: e.target.value || null })
+                }
+                placeholder="https://hooks.slack.com/services/..."
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => sendTest("slack")}
+                disabled={!prefs.slack_webhook_url || testing === "slack"}
+                title="Send a test message to Slack"
+              >
+                {testing === "slack" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                <span className="ml-1.5">Send test</span>
+              </Button>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>Default Channel (optional)</Label>
