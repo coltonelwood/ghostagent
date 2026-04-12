@@ -131,6 +131,7 @@ export const PATCH = withLogging(
         .from("policies")
         .update(updates)
         .eq("id", id)
+        .eq("org_id", auth.orgId) // defense-in-depth: enforce org on the UPDATE itself
         .select()
         .single();
 
@@ -169,7 +170,11 @@ export const DELETE = withLogging(
       }
 
       const db = getAdminClient();
-      const { error } = await db.from("policies").delete().eq("id", id);
+      const { error } = await db
+        .from("policies")
+        .delete()
+        .eq("id", id)
+        .eq("org_id", auth.orgId); // defense-in-depth
 
       if (error) throw error;
 

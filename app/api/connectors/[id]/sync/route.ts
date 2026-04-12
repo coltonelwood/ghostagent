@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { withLogging } from "@/lib/api-handler";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { requireRole, AuthError } from "@/lib/org-auth";
@@ -50,8 +51,15 @@ export const POST = withLogging(
         );
       }
 
-      // Fire-and-forget async sync
-      syncConnector(id).catch((err) => logger.error({ connectorId: id, err }, "background sync failed"));
+      // Run sync in the background. `after()` keeps the Vercel function
+      // alive until the promise resolves while letting the user response
+      // go out immediately. syncConnector is expected to write a failure
+      // row on its own error path so the UI can display a clear state.
+      after(
+        syncConnector(id).catch((err) =>
+          logger.error({ connectorId: id, err }, "background sync failed"),
+        ),
+      );
 
       return NextResponse.json({ success: true, message: "Sync started" });
     } catch (err) {

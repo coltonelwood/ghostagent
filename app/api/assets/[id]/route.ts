@@ -141,6 +141,7 @@ export const PATCH = withLogging(
         .from("assets")
         .update({ ...updates, last_changed_at: new Date().toISOString() })
         .eq("id", id)
+        .eq("org_id", auth.orgId) // defense-in-depth
         .select()
         .single();
 

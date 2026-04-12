@@ -8,6 +8,13 @@ import { emitEvent } from "./event-system";
 import { logger } from "./logger";
 import type { Asset, Connector, HREmployee, NormalizedAsset } from "./types/platform";
 
+/**
+ * Hard ceiling on assets persisted per single sync. Protects the DB, the
+ * risk engine loop, and memory on huge orgs. If we hit this, we log and
+ * surface a truncation notice on the connector so the operator knows.
+ */
+const MAX_ASSETS_PER_SYNC = 2_000;
+
 export async function syncConnector(connectorId: string): Promise<{success:boolean;assetsFound:number;assetsCreated:number;assetsUpdated:number;error?:string}> {
   const {data:row,error:cErr} = await adminClient.from("connectors").select("*").eq("id",connectorId).single();
   if (cErr||!row) return {success:false,assetsFound:0,assetsCreated:0,assetsUpdated:0,error:"Not found"};
@@ -20,12 +27,41 @@ export async function syncConnector(connectorId: string): Promise<{success:boole
   await adminClient.from("connectors").update({status:"active"}).eq("id",connectorId);
   let assetsCreated=0, assetsUpdated=0;
   try {
-    const creds = connector.credentials_encrypted ? decryptCredentials(connector.credentials_encrypted) : {} as Record<string,string>;
+    let creds: Record<string, string>;
+    try {
+      creds = connector.credentials_encrypted
+        ? decryptCredentials(connector.credentials_encrypted)
+        : ({} as Record<string, string>);
+    } catch (decryptErr) {
+      // Encryption key rotation or corruption — surface a specific error
+      // rather than letting an opaque crash happen deep in the connector.
+      logger.error(
+        { connectorId, err: decryptErr },
+        "decrypt failed — ENCRYPTION_KEY may have been rotated",
+      );
+      throw new Error(
+        "Stored credentials could not be decrypted. Please re-enter them.",
+      );
+    }
     const impl = getConnector(connector.kind);
     const hrEmployees = await getHREmployees(connector.org_id);
     const syncResult = await impl.sync(connector, {...creds,...(connector.config as Record<string,string>??{})});
+
+    // Truncate oversized result sets. Keeps the remainder of the pipeline
+    // bounded on 10k+ asset orgs.
+    let truncated = 0;
+    let assets = syncResult.assets;
+    if (assets.length > MAX_ASSETS_PER_SYNC) {
+      truncated = assets.length - MAX_ASSETS_PER_SYNC;
+      assets = assets.slice(0, MAX_ASSETS_PER_SYNC);
+      logger.warn(
+        { connectorId, total: syncResult.assets.length, kept: MAX_ASSETS_PER_SYNC, truncated },
+        "sync: asset count exceeded ceiling — truncating",
+      );
+    }
+
     const newIds: string[] = [];
-    for (const na of syncResult.assets) {
+    for (const na of assets) {
       const r = await upsertAsset(connector, na, hrEmployees);
       if (r.created) { assetsCreated++; newIds.push(r.id); } else assetsUpdated++;
       await scoreAndUpdate(r.id, connector.org_id);
@@ -33,9 +69,13 @@ export async function syncConnector(connectorId: string): Promise<{success:boole
     if (newIds.length) {
       await runPoliciesForOrg(connector.org_id, newIds).catch((e:unknown)=>logger.error({e},"policy engine error"));
     }
+    const processed = assets.length;
+    const body = truncated > 0
+      ? `Found ${syncResult.assets.length} AI assets. Processed the first ${processed} — raise your plan limit to scan the rest.`
+      : `Found ${processed} AI assets.`;
     await emitEvent({orgId:connector.org_id,kind:"connector_sync_completed",severity:"info",
-      title:connector.name + " sync completed",body:"Found " + syncResult.assets.length + " AI assets.",
-      connectorId,metadata:{assetsFound:syncResult.assets.length,assetsCreated,assetsUpdated}});
+      title:connector.name + " sync completed",body,
+      connectorId,metadata:{assetsFound:syncResult.assets.length,assetsProcessed:processed,truncated,assetsCreated,assetsUpdated}});
     if (syncId) {
       await adminClient.from("connector_syncs").update({
         status:"completed",completed_at:new Date().toISOString(),
@@ -44,7 +84,7 @@ export async function syncConnector(connectorId: string): Promise<{success:boole
     }
     await adminClient.from("connectors").update({
       last_sync_at:new Date().toISOString(),last_sync_status:"completed",
-      last_sync_error:null,last_sync_asset_count:syncResult.assets.length,
+      last_sync_error:null,last_sync_asset_count:processed,
     }).eq("id",connectorId);
     return {success:true,assetsFound:syncResult.assets.length,assetsCreated,assetsUpdated};
   } catch (err:unknown) {

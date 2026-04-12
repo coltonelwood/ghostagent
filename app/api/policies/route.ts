@@ -49,7 +49,7 @@ export const POST = withLogging(async (req: NextRequest) => {
       );
     }
 
-    const body = (await req.json()) as {
+    let body: {
       name: string;
       description?: string;
       severity?: string;
@@ -58,10 +58,36 @@ export const POST = withLogging(async (req: NextRequest) => {
       actions?: unknown[];
       dry_run_mode?: boolean;
     };
-
-    if (!body.name || !body.conditions) {
+    try {
+      body = await req.json();
+    } catch {
       return NextResponse.json(
-        { error: "name and conditions are required" },
+        { error: "Request body must be JSON." },
+        { status: 400 },
+      );
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object." },
+        { status: 400 },
+      );
+    }
+    if (!body.name || typeof body.name !== "string" || body.name.trim().length === 0) {
+      return NextResponse.json(
+        { error: "A policy name is required." },
+        { status: 400 },
+      );
+    }
+    if (body.name.length > 200) {
+      return NextResponse.json(
+        { error: "Policy name must be 200 characters or fewer." },
+        { status: 400 },
+      );
+    }
+    if (!body.conditions || typeof body.conditions !== "object") {
+      return NextResponse.json(
+        { error: "Policy conditions are required." },
         { status: 400 },
       );
     }
