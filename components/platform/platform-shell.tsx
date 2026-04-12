@@ -33,7 +33,6 @@ import {
   Settings,
   Menu,
   LogOut,
-  Users,
   Search,
 } from "lucide-react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -49,36 +48,15 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: "Operate",
-    items: [
-      { href: "/platform", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/platform/assets", label: "Assets", icon: Database },
-      { href: "/platform/events", label: "Events", icon: Bell },
-    ],
-  },
-  {
-    label: "Govern",
-    items: [
-      { href: "/platform/policies", label: "Policies", icon: Shield },
-      { href: "/platform/compliance", label: "Compliance", icon: ClipboardCheck },
-      { href: "/platform/reports", label: "Reports", icon: FileText },
-    ],
-  },
-  {
-    label: "Configure",
-    items: [
-      { href: "/platform/connectors", label: "Connectors", icon: Plug },
-      { href: "/platform/settings/team", label: "Team", icon: Users },
-      { href: "/platform/settings", label: "Settings", icon: Settings },
-    ],
-  },
+const NAV_ITEMS: NavItem[] = [
+  { href: "/platform", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/platform/connectors", label: "Connectors", icon: Plug },
+  { href: "/platform/assets", label: "Assets", icon: Database },
+  { href: "/platform/policies", label: "Policies", icon: Shield },
+  { href: "/platform/compliance", label: "Compliance", icon: ClipboardCheck },
+  { href: "/platform/events", label: "Events", icon: Bell },
+  { href: "/platform/reports", label: "Reports", icon: FileText },
+  { href: "/platform/settings", label: "Settings", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -106,46 +84,39 @@ function Sidebar({
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center gap-2.5 border-b border-sidebar-border px-5">
         <div className="flex size-7 items-center justify-center rounded bg-primary">
-          <span className="text-xs font-semibold text-primary-foreground">N</span>
+          <span className="text-xs font-semibold text-primary-foreground">S</span>
         </div>
-        <span className="text-[15px] font-semibold tracking-tight">Nexus</span>
+        <span className="text-[15px] font-semibold tracking-tight">Spekris</span>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
-        <nav className="flex flex-col gap-5">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label} className="flex flex-col gap-0.5 px-3">
-              <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-                {group.label}
-              </div>
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onNavigate}
-                    className={cn(
-                      "group/nav relative flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] font-medium transition-colors",
-                      active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                    )}
-                  >
-                    {active && (
-                      <span
-                        className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-primary"
-                        aria-hidden
-                      />
-                    )}
-                    <Icon className="size-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+        <nav className="flex flex-col gap-0.5 px-3">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "group/nav relative flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] font-medium transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                )}
+              >
+                {active && (
+                  <span
+                    className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-primary"
+                    aria-hidden
+                  />
+                )}
+                <Icon className="size-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
 

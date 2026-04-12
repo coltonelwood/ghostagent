@@ -3,18 +3,16 @@
 import Link from "next/link";
 import {
   Database,
-  AlertTriangle,
   UserX,
   ShieldAlert,
   Plug,
   ArrowRight,
   CheckCircle2,
   Activity,
-  Clock,
   ShieldCheck,
+  ClipboardCheck,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -48,126 +46,31 @@ interface AnalyticsData {
 // --------------------------------------------------------------------------
 
 function EmptyDashboard() {
-  const steps = [
-    {
-      step: "01",
-      title: "Connect a source",
-      description:
-        "Link GitHub, GitLab, AWS, or an automation platform. Credentials are encrypted with AES-256-GCM before storage.",
-      cta: "Add connector",
-      href: "/platform/connectors",
-      active: true,
-    },
-    {
-      step: "02",
-      title: "Run your first sync",
-      description:
-        "Nexus scans connected sources and surfaces every AI asset it finds — models, LLM integrations, feature flags, automations.",
-      cta: "Review sources",
-      href: "/platform/connectors",
-      active: false,
-    },
-    {
-      step: "03",
-      title: "Review the registry",
-      description:
-        "Each asset gets a risk score, owner, and compliance mapping. Set policies to enforce governance automatically.",
-      cta: "Open registry",
-      href: "/platform/assets",
-      active: false,
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Overview"
         description="Your AI asset landscape will appear here once you connect a source."
-        secondaryActions={
-          <Link
-            href="/demo"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            See a sample scan
-            <ArrowRight className="size-3.5" />
-          </Link>
-        }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {steps.map((item) => (
-          <div
-            key={item.step}
-            className={cn(
-              "nx-surface flex flex-col gap-3 p-5",
-              item.active && "ring-1 ring-primary/30",
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span
-                className={cn(
-                  "nx-mono text-[11px] font-semibold",
-                  item.active ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                Step {item.step}
-              </span>
-              {item.active && (
-                <span className="inline-flex items-center gap-1 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                  <span className="size-1.5 rounded-full bg-primary" aria-hidden />
-                  Start here
-                </span>
-              )}
-            </div>
-            <h3 className="text-base font-semibold tracking-tight">
-              {item.title}
-            </h3>
-            <p className="flex-1 text-[13px] leading-relaxed text-muted-foreground">
-              {item.description}
-            </p>
-            <Link
-              href={item.href}
-              className={cn(
-                "inline-flex items-center gap-1 text-xs font-medium",
-                item.active
-                  ? "text-primary hover:underline"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {item.cta} <ArrowRight className="size-3" />
-            </Link>
-          </div>
-        ))}
-      </div>
-
-      <div className="nx-surface p-5">
-        <h3 className="text-[13px] font-semibold tracking-tight">
-          Supported sources
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Ten integrations across code, cloud, automation, and HR.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {[
-            "GitHub",
-            "GitLab",
-            "AWS",
-            "Azure",
-            "GCP",
-            "Zapier",
-            "n8n",
-            "Make",
-            "BambooHR",
-            "Rippling",
-          ].map((name) => (
-            <span
-              key={name}
-              className="inline-flex h-7 items-center rounded-sm border border-border px-2 text-xs text-muted-foreground"
-            >
-              {name}
-            </span>
-          ))}
+      <div className="nx-surface flex flex-col items-center gap-4 px-6 py-16 text-center">
+        <div className="flex size-12 items-center justify-center rounded-lg border border-border bg-muted/40">
+          <Plug className="size-5 text-muted-foreground/70" aria-hidden />
         </div>
+        <h2 className="text-lg font-semibold tracking-tight">
+          Connect your first source to start scanning for AI agents
+        </h2>
+        <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+          Link GitHub, GitLab, AWS, or an automation platform. Spekris will scan
+          for AI assets and surface risks automatically.
+        </p>
+        <Link
+          href="/platform/connectors"
+          className={buttonVariants({ size: "default" })}
+        >
+          Add connector
+          <ArrowRight className="size-4" />
+        </Link>
       </div>
     </div>
   );
@@ -440,7 +343,7 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
               No production AI assets detected
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Nexus scanned{" "}
+              Spekris scanned{" "}
               <span className="nx-tabular font-medium text-foreground">
                 {analytics.connectorCount}
               </span>{" "}
@@ -541,7 +444,7 @@ function CleanScanDashboard({ analytics }: { analytics: AnalyticsData }) {
       )}
 
       <p className="text-[11px] text-muted-foreground/70">
-        Nexus surfaces evidence to support governance and compliance work. A
+        Spekris surfaces evidence to support governance and compliance work. A
         clean scan is a snapshot of what we observed in the sources you
         connected — re-run scans regularly or add more sources to broaden
         coverage.
@@ -575,132 +478,107 @@ export function CommandCenterDashboard({
       <PageHeader
         title="Overview"
         description="AI asset risk posture across your connected sources."
-        primaryAction={
-          <Link
-            href="/platform/reports"
-            className={buttonVariants({ size: "sm" })}
-          >
-            Export report
-            <ArrowRight className="size-3.5" />
-          </Link>
-        }
-        secondaryActions={
-          <div className="hidden items-center gap-1 rounded-md border border-border p-0.5 text-xs sm:flex">
-            {["7d", "30d", "90d"].map((range, i) => (
-              <button
-                key={range}
-                className={cn(
-                  "h-6 rounded-sm px-2 font-medium transition-colors",
-                  i === 1
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {range}
-              </button>
-            ))}
-          </div>
-        }
       />
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total assets"
-          value={analytics.totalAssets}
-          icon={Database}
-          description="Active AI systems"
-          href="/platform/assets"
-        />
-        <StatCard
-          label="Critical risk"
-          value={analytics.criticalAssets}
-          icon={AlertTriangle}
-          tone={analytics.criticalAssets > 0 ? "danger" : "neutral"}
-          description={
-            analytics.criticalAssets > 0 ? "Require attention" : "Clean"
-          }
-          href="/platform/assets?risk=critical"
-        />
-        <StatCard
-          label="Orphaned"
-          value={analytics.orphanedAssets}
-          icon={UserX}
-          tone={analytics.orphanedAssets > 0 ? "warning" : "neutral"}
-          description={
-            analytics.orphanedAssets > 0
-              ? "No active owner"
-              : "Every asset has an owner"
-          }
-          href="/platform/assets?owner=orphaned"
-        />
-        <StatCard
-          label="Open violations"
-          value={analytics.openViolations}
-          icon={ShieldAlert}
-          tone={analytics.openViolations > 0 ? "warning" : "neutral"}
-          description={
-            analytics.openViolations > 0 ? "Policy breaches" : "All clear"
-          }
-          href="/platform/policies"
-        />
+      {/* Hero metric — total AI assets */}
+      <div className="nx-surface flex flex-col items-center gap-2 p-8 text-center sm:flex-row sm:items-start sm:gap-8 sm:text-left">
+        <div className="flex flex-col items-center sm:items-start">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Total AI assets found
+          </span>
+          <Link href="/platform/assets" className="group">
+            <span className="text-5xl font-bold leading-none nx-tabular text-foreground group-hover:text-primary transition-colors">
+              {analytics.totalAssets}
+            </span>
+          </Link>
+          <span className="mt-1 text-xs text-muted-foreground">
+            across {analytics.connectorCount} connected source{analytics.connectorCount === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {/* Risk breakdown — color-coded inline */}
+        <div className="flex flex-1 items-center justify-center gap-4 sm:justify-end">
+          {(["critical", "high", "medium", "low"] as const).map((level) => {
+            const count = analytics.assetsByRiskLevel[level] ?? 0;
+            const variant = riskVariant(level);
+            return (
+              <Link
+                key={level}
+                href={`/platform/assets?risk=${level}`}
+                className="flex flex-col items-center gap-1 rounded-md px-3 py-2 transition-colors hover:bg-muted/60"
+              >
+                <span className={cn("text-2xl font-bold nx-tabular", variant.textClass)}>
+                  {count}
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <span className={cn("size-2 rounded-full", variant.dotClass)} aria-hidden />
+                  {variant.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Charts row */}
+      {/* Risk distribution bar */}
+      <RiskDistribution byLevel={analytics.assetsByRiskLevel} />
+
+      {/* Recent activity + scan action */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <RiskDistribution byLevel={analytics.assetsByRiskLevel} />
+        <RecentEvents events={analytics.recentEvents} />
         <SourceDistribution bySource={analytics.assetsBySource} />
       </div>
 
-      {/* Events + connectors */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RecentEvents events={analytics.recentEvents} />
-        <ConnectorHealth
-          byStatus={analytics.connectorsByStatus}
-          total={analytics.connectorCount}
-        />
-      </div>
-
-      {/* Compliance footer */}
-      {analytics.complianceScore !== null && (
-        <div className="nx-surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 items-center justify-center rounded-md bg-primary/10">
-              <ClockIcon />
-            </div>
-            <div>
-              <h3 className="text-[13px] font-semibold tracking-tight">
-                Compliance coverage
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                {analytics.complianceScore}% of mapped controls have evidence.
-              </p>
-            </div>
+      {/* Quick links — collapsed secondary info */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Link
+          href="/platform/policies"
+          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
+        >
+          <ShieldAlert className="size-4 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold nx-tabular">{analytics.openViolations}</p>
+            <p className="text-[11px] text-muted-foreground">Open violations</p>
           </div>
+        </Link>
+        <Link
+          href="/platform/assets?owner=orphaned"
+          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
+        >
+          <UserX className="size-4 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold nx-tabular">{analytics.orphanedAssets}</p>
+            <p className="text-[11px] text-muted-foreground">Orphaned assets</p>
+          </div>
+        </Link>
+        {analytics.complianceScore !== null && (
           <Link
             href="/platform/compliance"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
           >
-            Review frameworks
-            <ArrowRight className="size-3.5" />
+            <ClipboardCheck className="size-4 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold nx-tabular">{analytics.complianceScore}%</p>
+              <p className="text-[11px] text-muted-foreground">Compliance</p>
+            </div>
           </Link>
-        </div>
-      )}
-
-      {/* Safety / disclaimer strip */}
-      <p className="text-[11px] text-muted-foreground/70">
-        Nexus surfaces evidence to support governance and compliance work. It
-        does not certify compliance or replace a qualified auditor.
-      </p>
+        )}
+        <Link
+          href="/platform/connectors"
+          className="nx-surface flex items-center gap-3 p-4 transition-colors hover:border-border-strong"
+        >
+          <Plug className="size-4 text-muted-foreground" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold nx-tabular">{analytics.connectorCount}</p>
+            <p className="text-[11px] text-muted-foreground">Connectors</p>
+          </div>
+        </Link>
+      </div>
     </div>
   );
 }
 
 // --------------------------------------------------------------------------
-
-function ClockIcon() {
-  return <Clock className="size-5 text-primary" />;
-}
 
 function formatRelative(iso: string): string {
   const now = Date.now();
