@@ -15,7 +15,10 @@ export const POST = withLogging(
       const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
       const auth = await requireRole("operator");
 
-      const rl = apiRateLimiter.check(auth.userId);
+      // Both limits use the distributed backend when Upstash is
+      // configured so a multi-instance deploy can't be bypassed by
+      // hammering different Vercel regions.
+      const rl = await apiRateLimiter.checkAsync(auth.userId);
       if (!rl.allowed) {
         return NextResponse.json(
           { error: "Rate limit exceeded" },
@@ -24,7 +27,7 @@ export const POST = withLogging(
       }
 
       // Per-connector sync throttle: max 1 manual sync per 5 minutes
-      const syncRl = syncRateLimiter.check(id); // keyed on connector ID, not user
+      const syncRl = await syncRateLimiter.checkAsync(id);
       if (!syncRl.allowed) {
         return NextResponse.json(
           { error: "This connector was synced recently. Please wait before syncing again." },
