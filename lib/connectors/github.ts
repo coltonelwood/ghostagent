@@ -69,7 +69,12 @@ export class GitHubConnector implements NexusConnector {
   async validate(credentials: Record<string, string>) {
     try {
       const octokit = new Octokit({ auth: credentials.token });
-      await octokit.rest.orgs.get({ org: credentials.org });
+      // Try as an organization first; fall back to a personal user account.
+      try {
+        await octokit.rest.orgs.get({ org: credentials.org });
+      } catch {
+        await octokit.rest.users.getByUsername({ username: credentials.org });
+      }
       return { valid: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -99,13 +104,24 @@ export class GitHubConnector implements NexusConnector {
     }> = [];
     try {
       repos = await withRetry(async () => {
-        const { data } = await octokit.rest.repos.listForOrg({
-          org,
-          sort: "pushed",
-          direction: "desc",
-          per_page: MAX_REPOS,
-        });
-        return data;
+        // Try org endpoint first; fall back to user endpoint for personal accounts.
+        try {
+          const { data } = await octokit.rest.repos.listForOrg({
+            org,
+            sort: "pushed",
+            direction: "desc",
+            per_page: MAX_REPOS,
+          });
+          return data;
+        } catch {
+          const { data } = await octokit.rest.repos.listForUser({
+            username: org,
+            sort: "pushed",
+            direction: "desc",
+            per_page: MAX_REPOS,
+          });
+          return data;
+        }
       });
     } catch (err: unknown) {
       errors.push({
