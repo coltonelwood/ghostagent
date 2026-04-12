@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { adminClient } from "@/lib/supabase/admin";
 import { apiLogger } from "@/lib/logger";
+import { initializeTrial, trackOnboardingEvent } from "@/lib/growth-engine";
+import { sendWelcomeEmail } from "@/lib/email-sequences";
 
 export const dynamic = "force-dynamic";
 
@@ -200,6 +202,18 @@ export async function GET(req: NextRequest) {
           );
         } else {
           isNewUser = true;
+
+          // Initialize growth engine for new user (non-blocking)
+          Promise.all([
+            initializeTrial(org.id),
+            trackOnboardingEvent(org.id, user.id, "signup_completed"),
+            sendWelcomeEmail(org.id, email, (email.split("@")[0] ?? "My Organization") + "'s Organization"),
+          ]).catch((growthErr) => {
+            apiLogger.error(
+              { err: growthErr, userId: user.id, orgId: org.id },
+              "auth callback: growth engine initialization failed (non-blocking)",
+            );
+          });
         }
       }
     }

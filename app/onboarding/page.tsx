@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,6 +11,10 @@ import {
   Plug,
   Code,
   Zap,
+  ShieldAlert,
+  AlertTriangle,
+  UserX,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +23,8 @@ import { cn } from "@/lib/utils";
 const STEPS = [
   { n: 1, label: "Organization" },
   { n: 2, label: "Connect source" },
-  { n: 3, label: "Invite team" },
+  { n: 3, label: "Scanning" },
+  { n: 4, label: "Invite team" },
 ];
 
 export default function OnboardingPage() {
@@ -38,11 +43,86 @@ export default function OnboardingPage() {
   const [connectingSource, setConnectingSource] = useState(false);
   const [sourceError, setSourceError] = useState("");
 
+  // Step 3: Scan progress
+  const [scanStatus, setScanStatus] = useState<"waiting" | "scanning" | "done">("waiting");
+  const [scanAssets, setScanAssets] = useState(0);
+  const [scanCritical, setScanCritical] = useState(0);
+  const [scanOrphaned, setScanOrphaned] = useState(0);
+  const [scanPollCount, setScanPollCount] = useState(0);
+
+  // Step 4: Invite team
   const [inviteEmails, setInviteEmails] = useState<string[]>([""]);
   const [inviteRole, setInviteRole] = useState("viewer");
   const [inviting, setInviting] = useState(false);
   const [invitesSent, setInvitesSent] = useState(false);
   const [inviteError, setInviteError] = useState("");
+
+  // Track onboarding events for lead scoring
+  const trackEvent = useCallback(async (event: string, metadata: Record<string, unknown> = {}) => {
+    try {
+      await fetch("/api/growth/onboarding-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event, metadata }),
+      });
+    } catch {
+      // Non-blocking — don't let tracking failures affect onboarding
+    }
+  }, []);
+
+  // Poll for scan completion after connector is added
+  useEffect(() => {
+    if (step !== 2 || scanStatus === "done") return;
+
+    setScanStatus("scanning");
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/connectors");
+        if (!res.ok) return;
+        const connectors = await res.json();
+
+        // Look for any connector that has completed syncing
+        const completed = connectors.find?.(
+          (c: { last_sync_status: string | null; last_sync_asset_count: number | null }) =>
+            c.last_sync_status === "completed" || (c.last_sync_asset_count ?? 0) > 0,
+        );
+
+        if (completed) {
+          // Fetch asset summary
+          const assetsRes = await fetch("/api/assets?pageSize=1");
+          if (assetsRes.ok) {
+            const assetsData = await assetsRes.json();
+            const total = assetsData.total ?? completed.last_sync_asset_count ?? 0;
+            setScanAssets(total);
+
+            // Get risk breakdown if available
+            const critRes = await fetch("/api/assets?pageSize=1&filters=" + encodeURIComponent(JSON.stringify({ risk_level: "critical" })));
+            if (critRes.ok) {
+              const critData = await critRes.json();
+              setScanCritical(critData.total ?? 0);
+            }
+
+            const orphRes = await fetch("/api/assets?pageSize=1&filters=" + encodeURIComponent(JSON.stringify({ owner_status: "orphaned" })));
+            if (orphRes.ok) {
+              const orphData = await orphRes.json();
+              setScanOrphaned(orphData.total ?? 0);
+            }
+          }
+
+          setScanStatus("done");
+          trackEvent("first_sync_completed", { asset_count: completed.last_sync_asset_count });
+          trackEvent("first_assets_discovered", { asset_count: completed.last_sync_asset_count });
+          clearInterval(interval);
+        } else {
+          setScanPollCount((c) => c + 1);
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [step, scanStatus, trackEvent]);
 
   async function createOrg() {
     if (!orgName.trim()) {
@@ -65,6 +145,7 @@ export default function OnboardingPage() {
       }
       setOrgCreated(true);
       setCreatingOrg(false);
+      trackEvent("org_created", { orgName });
       setStep(1);
     } catch {
       setOrgError("Network error. Please try again.");
@@ -118,6 +199,8 @@ export default function OnboardingPage() {
         return;
       }
       setConnectingSource(false);
+      trackEvent("connector_added", { kind: connectorKind });
+      trackEvent("first_sync_started", { kind: connectorKind });
       setStep(2);
     } catch {
       setSourceError("Network error. Please try again.");
@@ -149,6 +232,7 @@ export default function OnboardingPage() {
       }
       setInvitesSent(true);
       setInviting(false);
+      trackEvent("team_invited", { count: validEmails.length });
     } catch {
       setInviteError("Network error. Please try again.");
       setInviting(false);
@@ -464,8 +548,133 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Invite Team */}
+          {/* Step 3: Scan Progress */}
           {step === 2 && (
+            <div className="nx-surface space-y-5 p-6">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">
+                  {scanStatus === "done" ? "Scan complete" : "Scanning your sources"}
+                </h2>
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  {scanStatus === "done"
+                    ? "Here's what Spekris found across your connected sources."
+                    : "Spekris is scanning for AI agents, LLM integrations, and automation workflows."}
+                </p>
+              </div>
+
+              {scanStatus !== "done" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 p-4">
+                    <Loader2 className="size-5 animate-spin text-primary" />
+                    <div>
+                      <p className="text-[13px] font-medium">Discovering AI systems</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Scanning repos, configs, dependencies, and environment files
+                        {scanPollCount > 3 ? " — this typically takes 1-3 minutes" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-1000"
+                      style={{ width: `${Math.min(90, scanPollCount * 8)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {scanStatus === "done" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <BarChart3 className="size-3.5 text-primary" />
+                        <span className="text-lg font-semibold nx-tabular">{scanAssets}</span>
+                      </div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">AI systems found</p>
+                    </div>
+                    {scanCritical > 0 && (
+                      <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <ShieldAlert className="size-3.5 text-destructive" />
+                          <span className="text-lg font-semibold nx-tabular text-destructive">{scanCritical}</span>
+                        </div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Critical risk</p>
+                      </div>
+                    )}
+                    {scanOrphaned > 0 && (
+                      <div className="rounded-md border border-warning/20 bg-warning/5 p-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <UserX className="size-3.5 text-warning" />
+                          <span className="text-lg font-semibold nx-tabular text-warning">{scanOrphaned}</span>
+                        </div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Orphaned</p>
+                      </div>
+                    )}
+                    {scanCritical === 0 && scanOrphaned === 0 && (
+                      <>
+                        <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <AlertTriangle className="size-3.5 text-muted-foreground" />
+                            <span className="text-lg font-semibold nx-tabular">0</span>
+                          </div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Critical risk</p>
+                        </div>
+                        <div className="rounded-md border border-border bg-muted/30 p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <UserX className="size-3.5 text-muted-foreground" />
+                            <span className="text-lg font-semibold nx-tabular">0</span>
+                          </div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Orphaned</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {scanAssets > 0 && (
+                    <div className="rounded-md border border-success/20 bg-success/5 px-3 py-2 text-[12px] text-success">
+                      Spekris discovered {scanAssets} AI system{scanAssets === 1 ? "" : "s"}.
+                      {scanCritical > 0 ? ` ${scanCritical} need${scanCritical === 1 ? "s" : ""} immediate review.` : ""}
+                      {scanOrphaned > 0 ? ` ${scanOrphaned} ha${scanOrphaned === 1 ? "s" : "ve"} no active owner.` : ""}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={skipToDashboard}
+                  className="text-[12px] text-muted-foreground hover:text-foreground"
+                >
+                  Skip to dashboard
+                </button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    trackEvent("onboarding_completed");
+                    setStep(3);
+                  }}
+                  disabled={scanStatus !== "done"}
+                >
+                  {scanStatus === "done" ? (
+                    <>
+                      Continue
+                      <ArrowRight className="size-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Waiting for scan
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Invite Team */}
+          {step === 3 && (
             <div className="nx-surface space-y-5 p-6">
               <div>
                 <h2 className="text-base font-semibold tracking-tight">
@@ -543,7 +752,7 @@ export default function OnboardingPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setStep(1)}
+                      onClick={() => setStep(2)}
                     >
                       <ArrowLeft className="size-3.5" />
                       Back

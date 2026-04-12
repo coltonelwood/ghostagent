@@ -11,6 +11,15 @@
     },
     "app/api/internal/sync-schedule/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/internal/growth-cron/route.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/internal/growth-cron",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }
