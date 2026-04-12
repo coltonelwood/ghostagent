@@ -17,7 +17,18 @@ import {
 import { withRetry } from "../retry";
 import { logger } from "../logger";
 
+/**
+ * Code-search patterns. These run as GitHub search queries per repo, so
+ * each entry is an extra rate-limited API call — keep the list focused
+ * on tokens with high precision (unlikely to false-positive on unrelated
+ * code) and low overlap (don't double-count the same file).
+ *
+ * Ordering matters only for readability. Each pattern contributes one
+ * search call per repo, so the total budget is approximately
+ * AI_FILE_PATTERNS.length * per-repo rate limit.
+ */
 const AI_FILE_PATTERNS = [
+  // Direct SDK imports — highest precision
   "langchain",
   "openai",
   "anthropic",
@@ -26,6 +37,15 @@ const AI_FILE_PATTERNS = [
   "amazon-bedrock",
   "google-generativeai",
   "azure-openai",
+  // On-prem / self-hosted — real companies run Ollama, vLLM, etc.
+  "ollama",
+  "vllm",
+  // Cloud-provider AI service names that don't collide with common English
+  "vertex-ai",
+  "bedrock-runtime",
+  // Vector DB extensions — a pgvector query is AI usage even without an SDK
+  "pgvector",
+  "CREATE EXTENSION vector",
 ];
 
 const MAX_REPOS = 25;
