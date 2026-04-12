@@ -386,7 +386,7 @@ export function AssetDetail({ asset: initialAsset }: { asset: AssetData }) {
                     <div key={tag} className="flex items-center gap-3 rounded-lg border p-3">
                       <Badge variant="secondary">{tag}</Badge>
                       <p className="text-sm text-muted-foreground">
-                        {tag === "HIPAA" && "This asset may involve patient data. Verify oversight documentation."}
+                        {tag === "HIPAA" && "This asset may involve protected health data. Verify oversight documentation with your compliance team."}
                         {tag === "SOC2" && "This asset should be included in your SOC 2 AI system inventory."}
                         {tag === "EU_AI_ACT" && "Review documentation requirements under EU AI Act Articles 9–17."}
                         {tag === "ISO42001" && "Ensure governance documentation meets ISO/IEC 42001 control requirements."}

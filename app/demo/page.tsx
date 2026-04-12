@@ -46,7 +46,7 @@ const FINDINGS: Finding[] = [
     owner: null,
     ownerStatus: "orphaned",
     lastActive: 247,
-    frameworks: ["HIPAA", "SOC 2"],
+    frameworks: ["SOC 2", "NIST AI RMF"],
     services: ["postgres", "openai"],
     description:
       "Production ML model scoring every claim submission for fraud. Confidence threshold 0.85.",
@@ -64,7 +64,7 @@ const FINDINGS: Finding[] = [
     owner: "achen@acme.com",
     ownerStatus: "inactive",
     lastActive: 203,
-    frameworks: ["HIPAA", "EU AI Act"],
+    frameworks: ["EU AI Act", "ISO 42001"],
     services: ["postgres"],
     description:
       "Fine-tuned Bio_ClinicalBERT model classifying urgency of patient messages. Runs as a FastAPI service.",
@@ -82,12 +82,12 @@ const FINDINGS: Finding[] = [
     owner: "ajiang@acme.com",
     ownerStatus: "inactive",
     lastActive: 189,
-    frameworks: ["HIPAA"],
+    frameworks: ["SOC 2"],
     services: [],
     description:
       "Patient-provider WebSocket chat prototype. No authentication. In-memory only. No audit logging.",
     finding:
-      "If this prototype ever processed real patient data in this state, it may create significant HIPAA exposure. Original author inactive for 189 days.",
+      "Prototype with no auth or audit logging processing sensitive data. Original author inactive for 189 days. Significant compliance and data exposure risk.",
   },
   {
     id: "4",
@@ -100,7 +100,7 @@ const FINDINGS: Finding[] = [
     owner: "schen@acme.com",
     ownerStatus: "active",
     lastActive: 91,
-    frameworks: ["HIPAA", "SOC 2"],
+    frameworks: ["SOC 2", "NIST AI RMF"],
     services: [],
     description:
       "AI-powered ICD-10 and CPT billing code suggestions. Active at 20% rollout. Fine-tuned model.",
@@ -128,10 +128,10 @@ const FINDINGS: Finding[] = [
 ];
 
 const FRAMEWORK_CLASS: Record<string, string> = {
-  HIPAA: "border-destructive/20 bg-destructive/10 text-destructive",
   "SOC 2": "border-info/20 bg-info/10 text-info",
   "EU AI Act": "border-primary/20 bg-primary/10 text-primary",
   "ISO 42001": "border-primary/20 bg-primary/10 text-primary",
+  "NIST AI RMF": "border-destructive/20 bg-destructive/10 text-destructive",
 };
 
 // --------------------------------------------------------------------------
@@ -142,7 +142,7 @@ export default function DemoPage() {
     (f) => !f.owner || f.ownerStatus === "orphaned",
   ).length;
   const inactive = FINDINGS.filter((f) => f.ownerStatus === "inactive").length;
-  const hipaa = FINDINGS.filter((f) => f.frameworks.includes("HIPAA")).length;
+  const highRisk = FINDINGS.filter((f) => f.risk === "critical" || f.risk === "high").length;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -226,11 +226,11 @@ export default function DemoPage() {
             description="Owner departed or dormant"
           />
           <StatCard
-            label="HIPAA exposure"
-            value={hipaa}
+            label="High risk"
+            value={highRisk}
             icon={ShieldAlert}
             tone="danger"
-            description="Potential PHI touchpoints"
+            description="Critical or high severity"
           />
         </div>
 
@@ -244,8 +244,8 @@ export default function DemoPage() {
               </span>
               <span className="text-foreground">
                 {" "}
-                — {unowned} with no owner on record, {hipaa} involving data
-                covered by HIPAA. Recommended for review before your next audit.
+                — {unowned} with no owner on record, {highRisk} flagged as high
+                risk. Recommended for review before your next audit.
               </span>
             </div>
           </div>
