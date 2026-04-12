@@ -13,6 +13,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // Defensive safety net for magic-link flows. When the Supabase
+  // dashboard's "Redirect URLs" allowlist doesn't include the URL we
+  // pass as `emailRedirectTo`, Supabase silently falls back to the
+  // project's configured "Site URL" and drops the `?code=...` on the
+  // ROOT path — e.g. `https://site.com/?code=abc123`. There's no route
+  // handler at `/` that can call `exchangeCodeForSession`, so the user
+  // lands on the marketing page with an unusable code in the URL.
+  //
+  // Catch that case here and forward to `/auth/callback?code=...`
+  // which owns the exchange. This is belt-and-suspenders — the real
+  // fix is configuring the Supabase dashboard — but it means a
+  // misconfiguration never produces a dead sign-in page.
+  if (pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
