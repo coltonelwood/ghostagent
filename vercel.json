@@ -20,7 +20,7 @@
     },
     {
       "path": "/api/internal/sync-schedule",
-      "schedule": "0 */1 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
