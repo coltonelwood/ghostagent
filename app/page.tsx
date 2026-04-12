@@ -373,7 +373,7 @@ export default function LandingPage() {
               AI system visibility and control
             </div>
             <h1 className="text-[2.5rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-              Know every AI system running in your company.
+              Know the AI systems running across your company.
             </h1>
             <p className="max-w-xl text-base text-muted-foreground leading-relaxed">
               Spekris scans your GitHub, GitLab, and cloud environments to
@@ -490,7 +490,7 @@ export default function LandingPage() {
             How it works
           </div>
           <h2 className="max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Three steps from zero visibility to a governed AI inventory.
+            Three steps from limited visibility to a governed AI inventory.
           </h2>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-3">
@@ -589,7 +589,7 @@ export default function LandingPage() {
             Spekris generates compliance documentation mapped to specific controls
             across four frameworks, so you can hand structured evidence to your
             security team or assessor. Spekris supports your compliance efforts
-            — it does not certify compliance.
+            — it does not certify compliance and is not a substitute for a qualified auditor.
           </p>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2">
