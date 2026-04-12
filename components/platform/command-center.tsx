@@ -650,50 +650,48 @@ export function CommandCenterDashboard({
   if (analytics.totalAssets === 0) return <CleanScanDashboard analytics={analytics} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">AI Control Plane</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {analytics.totalAssets} AI system{analytics.totalAssets === 1 ? "" : "s"} detected
-            across {analytics.connectorCount} source{analytics.connectorCount === 1 ? "" : "s"}.
-          </p>
-        </div>
-        <Link href="/platform/assets" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          <ExternalLink className="size-3.5" /> Full registry
-        </Link>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">AI Control Plane</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {analytics.totalAssets} AI system{analytics.totalAssets === 1 ? "" : "s"} across {analytics.connectorCount} source{analytics.connectorCount === 1 ? "" : "s"}
+          {analytics.lastSyncAt && <> · Last scan {formatRelative(analytics.lastSyncAt)}</>}
+        </p>
       </div>
 
-      {/* Signal cards */}
+      {/* Key metrics — 2x2 grid that works on mobile */}
       <SignalCards analytics={analytics} />
 
-      {/* Status strip — compliance, violations, connectors, last scan */}
-      <StatusStrip analytics={analytics} />
-
-      {/* Ownership coverage */}
-      <OwnershipCoverage analytics={analytics} />
-
-      {/* Highest risk systems */}
-      <HighestRiskSystems assets={analytics.topRiskAssets} />
-
-      {/* What you should do next */}
+      {/* What you should do — most important for decision-making */}
       <InsightsPanel analytics={analytics} />
 
-      {/* Systems by type + environment */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SystemsByType byKind={analytics.assetsByKind} />
-        <EnvironmentBreakdown byEnv={analytics.assetsByEnvironment} />
+      {/* Highest risk systems — actionable */}
+      <HighestRiskSystems assets={analytics.topRiskAssets} />
+
+      {/* Ownership + compliance side by side on desktop, stacked on mobile */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <OwnershipCoverage analytics={analytics} />
+        {analytics.complianceScore !== null && (
+          <Link href="/platform/compliance" className="nx-surface flex items-center gap-4 p-5 transition-colors hover:border-border-strong">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold tracking-tight">Compliance Score</h3>
+                <span className={cn("text-lg font-bold nx-tabular", analytics.complianceScore >= 70 ? "text-success" : analytics.complianceScore >= 40 ? "text-warning" : "text-destructive")}>{analytics.complianceScore}%</span>
+              </div>
+              <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-muted">
+                <div className={cn("h-full rounded-full", analytics.complianceScore >= 70 ? "bg-success" : analytics.complianceScore >= 40 ? "bg-warning" : "bg-destructive")} style={{ width: `${analytics.complianceScore}%` }} />
+              </div>
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Across 4 frameworks. <span className="font-medium text-foreground">View details →</span>
+              </p>
+            </div>
+          </Link>
+        )}
       </div>
 
-      {/* Risk distribution */}
-      <RiskBar byLevel={analytics.assetsByRiskLevel} />
-
-      {/* Activity + source breakdown */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <WhatsHappening events={analytics.recentEvents} />
-        <SourceBreakdown bySource={analytics.assetsBySource} />
-      </div>
+      {/* Activity feed */}
+      <WhatsHappening events={analytics.recentEvents} />
     </div>
   );
 }
