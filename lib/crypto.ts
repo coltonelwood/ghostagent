@@ -43,6 +43,25 @@ export function encryptCredentials(credentials: Record<string, string>): string 
 
 export function decryptCredentials(encrypted: string): Record<string, string> {
   if (!encrypted) return {};
-  const json = decrypt(encrypted);
-  return JSON.parse(json) as Record<string, string>;
+  let json: string;
+  try {
+    json = decrypt(encrypted);
+  } catch (err) {
+    throw new Error(
+      "Failed to decrypt stored credentials (ENCRYPTION_KEY may have been rotated or the payload is corrupted).",
+      { cause: err },
+    );
+  }
+  try {
+    const parsed = JSON.parse(json);
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("Decrypted payload is not an object");
+    }
+    return parsed as Record<string, string>;
+  } catch (err) {
+    throw new Error(
+      "Decrypted credentials payload is malformed and could not be parsed.",
+      { cause: err },
+    );
+  }
 }

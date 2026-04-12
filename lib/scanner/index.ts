@@ -39,6 +39,21 @@ import {
 const MAX_REPOS_PER_SCAN = 10;
 const TIME_LIMIT_MS = 4 * 60 * 1000; // 4 min — leaves 60s buffer for Vercel 300s
 
+/**
+ * Hard cap on how many findings we send to the GPT classifier in one scan.
+ * Each call is ~$0.01–$0.02 and takes ~2s; a runaway scan could drain
+ * spend budget or time out Vercel. Anything beyond this cap still gets
+ * inserted but with a heuristic classification instead of an LLM one.
+ */
+const MAX_LLM_CLASSIFICATIONS_PER_SCAN = 60;
+
+/**
+ * Absolute ceiling on findings per scan. Protects against pattern
+ * runaway on huge monorepos. Findings are ranked by tier + signal before
+ * being truncated, so the best-signal ones always make the cut.
+ */
+const MAX_FINDINGS_PER_SCAN = 500;
+
 let _openai: OpenAI | null = null;
 function getOpenAI() {
   if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -237,8 +252,29 @@ async function classifyAgent(
   agent: FoundAgent,
   pattern: DetectionPattern,
   boostMap: Map<string, number>,
+  opts: { skipLLM?: boolean } = {},
 ): Promise<{ risk_level: string; risk_reason: string; why_flagged: string; description: string; compliance_tags: string[]; confidence_score: number }> {
   const { floor, escalationReasons } = computeBaseRisk(agent, pattern, boostMap);
+
+  // Budget-exhausted path: skip OpenAI entirely and use curated templates.
+  if (opts.skipLLM) {
+    const fb = resolveFallbackReason(
+      agent.detection_class as DetectionClass,
+      { name: agent.agent_type || agent.name, repo: agent.repo, file: agent.file_path },
+      escalationReasons,
+    );
+    return {
+      risk_level: floor,
+      risk_reason: fb.riskReason,
+      why_flagged: fb.whyFlagged,
+      description: fb.description,
+      compliance_tags: resolveComplianceTags(
+        agent.detection_class as DetectionClass,
+        agent.phi_context,
+      ),
+      confidence_score: tier1Confidence(agent, pattern),
+    };
+  }
 
   const escalationNote = escalationReasons.length > 0
     ? `\n\nPRE-COMPUTED RISK ESCALATIONS (enforce these — do not downgrade below "${floor}"):\n` +
@@ -561,7 +597,32 @@ export async function runScan(scanId: string, workspaceId: string) {
       }
     }
 
-    scanLogger.info({ scanId, foundAgents: foundAgents.length, reposScanned }, "scan: classifying");
+    // Rank best-signal findings first so if we have to truncate we keep
+    // the ones most likely to matter.
+    foundAgents.sort((a, b) => {
+      const ap = a.phi_context ? 1 : 0;
+      const bp = b.phi_context ? 1 : 0;
+      if (ap !== bp) return bp - ap; // PHI first
+      if (a.tier !== b.tier) return a.tier - b.tier; // lower tier = higher precision
+      return b.signal_score - a.signal_score;
+    });
+
+    // Absolute ceiling on findings. Anything beyond this is dropped with
+    // a log so we know it happened.
+    let truncatedBeyondCeiling = 0;
+    if (foundAgents.length > MAX_FINDINGS_PER_SCAN) {
+      truncatedBeyondCeiling = foundAgents.length - MAX_FINDINGS_PER_SCAN;
+      foundAgents.length = MAX_FINDINGS_PER_SCAN;
+      scanLogger.warn(
+        { scanId, truncatedBeyondCeiling, kept: MAX_FINDINGS_PER_SCAN },
+        "scan: finding count exceeded ceiling — truncating",
+      );
+    }
+
+    scanLogger.info(
+      { scanId, foundAgents: foundAgents.length, reposScanned, truncatedBeyondCeiling },
+      "scan: classifying",
+    );
 
     await adminClient.from("scans").update({
       status: "classifying",
@@ -572,13 +633,44 @@ export async function runScan(scanId: string, workspaceId: string) {
     // ── CLASSIFY ──────────────────────────────────────────────────────────
     const byClass: Record<string, number> = {};
     const byRisk: Record<string, number> = {};
+    let llmCallsUsed = 0;
 
     for (const agent of foundAgents) {
       const pattern = ALL_PATTERNS.find(p => p.query === agent.pattern_query)
         ?? ALL_PATTERNS.find(p => p.label === agent.agent_type)
         ?? { query: agent.pattern_query, label: agent.agent_type, class: agent.detection_class as never, tier: agent.tier };
 
-      const classification = await classifyAgent(agent, pattern, boostMap);
+      // Budget guard: cap LLM calls per scan. Once the cap is hit, every
+      // remaining finding gets the curated fallback classification — no
+      // new OpenAI spend. Users still see professional copy because
+      // classifyAgent's fallback path is template-driven.
+      const llmBudgetExhausted = llmCallsUsed >= MAX_LLM_CLASSIFICATIONS_PER_SCAN;
+      const classification = await classifyAgent(
+        agent,
+        pattern,
+        boostMap,
+        { skipLLM: llmBudgetExhausted },
+      );
+      if (!llmBudgetExhausted) llmCallsUsed++;
+
+      // Drop very-low-signal findings that didn't escalate to high/critical.
+      // A tier-4 match on `xgboost` with no PHI, no secrets, no stale owner,
+      // and confidence < 35 is noise we shouldn't confuse the user with.
+      if (
+        classification.confidence_score < 35 &&
+        classification.risk_level !== "critical" &&
+        classification.risk_level !== "high"
+      ) {
+        scanLogger.info(
+          {
+            scanId,
+            file: agent.file_path,
+            confidence: classification.confidence_score,
+          },
+          "scan: dropping low-confidence finding",
+        );
+        continue;
+      }
 
       // Track metrics
       byClass[agent.detection_class] = (byClass[agent.detection_class] ?? 0) + 1;

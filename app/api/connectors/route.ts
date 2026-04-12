@@ -49,16 +49,51 @@ export async function POST(req: NextRequest) {
     const user = await getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = await req.json() as {
+    let body: {
       org_id?: string;
-      kind: string;
-      name: string;
-      credentials: Record<string, string>;
+      kind?: string;
+      name?: string;
+      credentials?: Record<string, string>;
       config?: Record<string, unknown>;
     };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Request body must be JSON." },
+        { status: 400 },
+      );
+    }
 
-    if (!body.kind || !body.credentials) {
-      return NextResponse.json({ error: "kind and credentials are required" }, { status: 400 });
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "Request body must be a JSON object." },
+        { status: 400 },
+      );
+    }
+    if (!body.kind || typeof body.kind !== "string") {
+      return NextResponse.json(
+        { error: "A connector kind is required." },
+        { status: 400 },
+      );
+    }
+    if (
+      !body.credentials ||
+      typeof body.credentials !== "object" ||
+      Array.isArray(body.credentials)
+    ) {
+      return NextResponse.json(
+        { error: "Credentials must be provided as an object." },
+        { status: 400 },
+      );
+    }
+    // Cap the payload size to prevent oversized DB writes / memory blowup.
+    const credBytes = JSON.stringify(body.credentials).length;
+    if (credBytes > 10_000) {
+      return NextResponse.json(
+        { error: "Credential payload is too large." },
+        { status: 413 },
+      );
     }
 
     let org: Organization;
@@ -79,22 +114,29 @@ export async function POST(req: NextRequest) {
       }, { status: 402 });
     }
 
-    const def = getConnectorDefinition(body.kind as never);
-    if (!def) return NextResponse.json({ error: `Unknown connector kind: ${body.kind}` }, { status: 400 });
+    const kind = body.kind;
+    const credentials = body.credentials;
+    const def = getConnectorDefinition(kind as never);
+    if (!def) return NextResponse.json({ error: `Unknown connector kind: ${kind}` }, { status: 400 });
 
-    const impl = getConnector(body.kind as never);
-    const validation = await impl.validate(body.credentials);
+    const impl = getConnector(kind as never);
+    const validation = await impl.validate(credentials);
     if (!validation.valid) {
-      return NextResponse.json({ error: `Credential validation failed: ${validation.error}` }, { status: 422 });
+      return NextResponse.json(
+        {
+          error: `Couldn't verify those credentials${validation.error ? `: ${validation.error}` : "."} Double-check the values and try again.`,
+        },
+        { status: 422 },
+      );
     }
 
-    const encryptedCreds = encryptCredentials(body.credentials);
+    const encryptedCreds = encryptCredentials(credentials);
 
     const { data: connector, error } = await adminClient
       .from("connectors")
       .insert({
         org_id: org.id,
-        kind: body.kind,
+        kind,
         name: body.name || `${def.displayName} — ${org.name}`,
         status: "active",
         credentials_encrypted: encryptedCreds,
@@ -109,15 +151,30 @@ export async function POST(req: NextRequest) {
     await auditLog({
       orgId: org.id, actorId: user.id, actorEmail: user.email,
       action: "connector.created", resourceType: "connector", resourceId: connector.id,
-      metadata: { kind: body.kind, name: connector.name }, req,
+      metadata: { kind, name: connector.name }, req,
     });
 
-    // Trigger initial sync asynchronously
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/internal/sync-worker`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-internal-key": process.env.INTERNAL_API_KEY ?? "" },
-      body: JSON.stringify({ connectorId: connector.id }),
-    }).catch(() => {});
+    // Dispatch initial sync in the background. Requires both env vars
+    // to be configured — env.ts fails startup otherwise, so this is
+    // guaranteed in production but defensive in development.
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+    const internalKey = process.env.INTERNAL_API_KEY;
+    if (baseUrl && internalKey) {
+      fetch(`${baseUrl.replace(/\/$/, "")}/api/internal/sync-worker`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-key": internalKey,
+        },
+        body: JSON.stringify({ connectorId: connector.id }),
+        signal: AbortSignal.timeout(10_000),
+      }).catch((err) =>
+        logger.error(
+          { connectorId: connector.id, err },
+          "initial sync dispatch failed",
+        ),
+      );
+    }
 
     return NextResponse.json({ data: { ...connector, credentials_encrypted: undefined } }, { status: 201 });
   } catch (err) {
