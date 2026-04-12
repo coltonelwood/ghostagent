@@ -26,6 +26,8 @@ import {
   AI_FLAG_NAME_PATTERN,
   resolveComplianceTags,
   resolveFallbackReason,
+  isEducationalPath,
+  looksLikeFrameworkRepo,
   type DetectionPattern,
   type DetectionClass,
 } from "./detection-classes";
@@ -53,6 +55,14 @@ const MAX_LLM_CLASSIFICATIONS_PER_SCAN = 60;
  * being truncated, so the best-signal ones always make the cut.
  */
 const MAX_FINDINGS_PER_SCAN = 500;
+
+/**
+ * Per-repo cap. Prevents a single framework fork (e.g. a customer's
+ * copy of langchain-ai/langchain) from dominating the scan summary.
+ * Ranked + truncated during collection so the rest of the org still
+ * gets attention.
+ */
+const MAX_FINDINGS_PER_REPO = 30;
 
 let _openai: OpenAI | null = null;
 function getOpenAI() {
@@ -134,6 +144,29 @@ function computeBaseRisk(agent: FoundAgent, pattern: DetectionPattern, boostMap:
 } {
   const reasons: string[] = [];
   let level = "medium";
+
+  // Framework-repo short-circuit: if the enclosing repo IS an AI
+  // framework or curated collection, no finding from it represents an
+  // operational AI system in the customer's stack. Cap at "low" and
+  // explain why so the summary stays honest.
+  if (agent.framework_repo) {
+    reasons.push(
+      agent.framework_reason
+        ? `${agent.framework_reason} Findings here reflect library internals, not your organization's operational AI footprint.`
+        : "This repository appears to be an AI framework or curated collection. Findings reflect the library itself, not your operational AI systems.",
+    );
+    return { floor: "low", escalationReasons: [...new Set(reasons)] };
+  }
+
+  // Educational-path short-circuit: a file under examples/, cookbook/,
+  // tutorials/, docs/, or a .ipynb at any depth is documentation, not
+  // production. Cap at "low" with a note.
+  if (agent.is_educational) {
+    reasons.push(
+      "File is under an examples, docs, cookbook, tutorials, or notebooks path. Treated as educational content, not an operational AI system.",
+    );
+    return { floor: "low", escalationReasons: [...new Set(reasons)] };
+  }
 
   // Apply pattern's own floor
   if (pattern.riskFloor) level = maxRisk(level, pattern.riskFloor);
@@ -240,6 +273,11 @@ interface FoundAgent {
   services: string[];
   has_secrets: boolean;
   is_prototype: boolean;
+  is_educational: boolean;
+  /** True if the enclosing repo is itself an AI framework/library/catalog. */
+  framework_repo: boolean;
+  /** Human-readable reason we decided the repo is a framework (for the UI). */
+  framework_reason?: string;
   phi_context: boolean;
   signal_score: number;
   extra_reasons: string[];
@@ -407,6 +445,16 @@ Risk level rules (STRICT — never downgrade below "${floor}"):
  * the UI with low-signal detections.
  */
 function tier1Confidence(agent: FoundAgent, pattern: DetectionPattern): number {
+  // Framework repo and educational paths are systematically low signal —
+  // cap their confidence aggressively so real findings from operational
+  // code always rank above them in the UI. A downstream filter drops
+  // confidence < 35 unless risk is high/critical, and the
+  // framework/educational short-circuit in computeBaseRisk forces risk
+  // to "low" for these — so they're filtered out entirely most of the
+  // time. This cap is defense-in-depth for the remaining edge cases.
+  if (agent.framework_repo) return 30;
+  if (agent.is_educational) return 35;
+
   const tier = pattern.tier ?? 3;
   let score: number;
   if (tier <= 2) {
@@ -508,8 +556,40 @@ export async function runScan(scanId: string, workspaceId: string) {
       // Detect PHI context from env file cached above
       const repoPhiContext = foundAgents.some(a => a.repo === repo.full_name && a.phi_context);
 
+      // Detect whether this repo IS an AI framework / library / catalog.
+      // When it is, we still scan it (so the user sees the signal exists)
+      // but every finding gets flagged and severity-capped at "low" so
+      // framework internals don't drown real operational AI findings.
+      const frameworkCheck = looksLikeFrameworkRepo(
+        repo as {
+          name?: string;
+          full_name?: string;
+          description?: string | null;
+          topics?: string[] | null;
+        },
+      );
+      if (frameworkCheck.isFramework) {
+        scanLogger.info(
+          { scanId, repo: repo.full_name, reason: frameworkCheck.reason },
+          "scan: repo detected as AI framework — findings will be dampened",
+        );
+      }
+
+      // Per-repo cap — stop scanning new patterns once a single repo
+      // reaches the ceiling. Prevents a customer's fork of langchain/
+      // langchain from burning through the global finding budget.
+      const repoAgentCount = () =>
+        foundAgents.filter((a) => a.repo === repo.full_name).length;
+
       for (const pattern of activePatterns) {
         if (Date.now() - scanStart > TIME_LIMIT_MS) break;
+        if (repoAgentCount() >= MAX_FINDINGS_PER_REPO) {
+          scanLogger.info(
+            { scanId, repo: repo.full_name, cap: MAX_FINDINGS_PER_REPO },
+            "scan: per-repo finding cap reached — moving on",
+          );
+          break;
+        }
 
         await sleep(2000); // GitHub search rate limit: 30 req/min
 
@@ -534,6 +614,8 @@ export async function runScan(scanId: string, workspaceId: string) {
           for (const item of searchResult.data.items) {
             // Skip noise
             if (["node_modules", "vendor", ".lock", "package-lock", ".min."].some(s => item.path.includes(s))) continue;
+            // Per-repo cap reached mid-page — drop the rest
+            if (repoAgentCount() >= MAX_FINDINGS_PER_REPO) break;
             // Skip duplicates (same file already found by another pattern)
             if (foundAgents.some(a => a.repo === repo.full_name && a.file_path === item.path)) continue;
 
@@ -581,6 +663,9 @@ export async function runScan(scanId: string, workspaceId: string) {
                 services: extractServices(content),
                 has_secrets: detectSecrets(content),
                 is_prototype: isPrototypePath(item.path),
+                is_educational: isEducationalPath(item.path),
+                framework_repo: frameworkCheck.isFramework,
+                framework_reason: frameworkCheck.reason,
                 phi_context: repoPhiContext || detectPhiContext(content),
                 signal_score: signalScore,
                 extra_reasons: extraReasons,
@@ -829,6 +914,8 @@ async function scanFlagFiles(
           services: [],
           has_secrets: false,
           is_prototype: flagPath.startsWith("experiments/"),
+          is_educational: isEducationalPath(flagPath),
+          framework_repo: false,
           phi_context: isPhi,
           signal_score: enabled && rollout > 0 ? 0.7 : 0.3,
           extra_reasons: enabled && rollout > 0 ? [`active at ${rollout}% rollout`] : ["disabled — dormant AI system"],
@@ -869,6 +956,8 @@ function makeEnvAsset(
     services: extractServices(content),
     has_secrets: detectSecrets(content),
     is_prototype: false,
+    is_educational: isEducationalPath(filePath),
+    framework_repo: false,
     phi_context: phiContext,
     signal_score: signalScore,
     extra_reasons: extraReasons,

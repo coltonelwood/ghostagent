@@ -265,6 +265,9 @@ export const PHI_ENV_SIGNALS: RegExp[] = [
 ];
 
 // ─── PROTOTYPE PATH SIGNALS ───────────────────────────────────────────────
+// Paths that indicate experimentation INSIDE a company's repo. Hitting
+// one of these INCREASES risk — prototype code running in production
+// without oversight is a governance concern.
 export const PROTOTYPE_PATH_SIGNALS: RegExp[] = [
   /^experiments\//i,
   /^prototype/i,
@@ -282,6 +285,141 @@ export const NON_AI_EXPERIMENT_EXCLUSIONS: RegExp[] = [
   /\/load-test/i,
   /\/benchmark/i,
 ];
+
+// ─── EDUCATIONAL PATH SIGNALS ─────────────────────────────────────────────
+// Paths that indicate documentation / examples / tutorials / demos.
+// Hitting one of these DECREASES risk and confidence because the file
+// is almost certainly not an operational AI system. Without this, the
+// scanner flags every openai-cookbook notebook as critical.
+export const EDUCATIONAL_PATH_SIGNALS: RegExp[] = [
+  /^docs?\//i,
+  /\/docs?\//i,
+  /^examples?\//i,
+  /\/examples?\//i,
+  /^cookbook\//i,
+  /\/cookbook\//i,
+  /^tutorials?\//i,
+  /\/tutorials?\//i,
+  /^demos?\//i,
+  /\/demos?\//i,
+  /^samples?\//i,
+  /\/samples?\//i,
+  /^quickstart\//i,
+  /\/quickstart\//i,
+  /^notebooks?\//i,
+  /\/notebooks?\//i,
+  /\.ipynb$/i,
+  /^getting[-_]started\//i,
+  /README(\.\w+)?$/,
+];
+
+export function isEducationalPath(filePath: string): boolean {
+  return EDUCATIONAL_PATH_SIGNALS.some((p) => p.test(filePath));
+}
+
+// ─── FRAMEWORK/LIBRARY REPO DETECTION ────────────────────────────────────
+// Signals that a repo IS an AI framework/library rather than a consumer
+// of one. Scanning the langchain source tree the same way we scan a
+// customer's private monorepo produces noise — every file matches
+// every tier-1 pattern because AI is literally the product. When a
+// repo trips these signals we cap findings at "low" severity with a
+// note so the demo doesn't drown in framework internals.
+//
+// Matched against:
+//   - repo.name
+//   - repo.description
+//   - repo.topics (if available via GitHub API)
+//   - repo.full_name (for org-based matches like "langchain-ai/langchain")
+export const FRAMEWORK_REPO_NAME_PATTERNS: RegExp[] = [
+  /\blangchain\b/i,
+  /\blanggraph\b/i,
+  /\blangflow\b/i,
+  /\bllamaindex\b/i,
+  /\bhaystack\b/i,
+  /\bautogen\b/i,
+  /\bcrewai\b/i,
+  /\bagno\b/i,
+  /\bauto[-_]?gpt\b/i,
+  /\bopenai[-_](cookbook|python|node|agents|sdk)\b/i,
+  /\banthropic[-_]?(sdk|cookbook)\b/i,
+  /\b(awesome|best)[-_](llm|ai|agent|ml)\b/i,
+  /^llm[-_]/i,
+  /[-_]llm$/i,
+];
+
+export const FRAMEWORK_REPO_DESCRIPTION_PATTERNS: RegExp[] = [
+  /\bframework\b.*\b(ai|llm|agent|ml)\b/i,
+  /\b(ai|llm|agent|ml)\b.*\bframework\b/i,
+  /\b(library|sdk|toolkit)\b.*\b(ai|llm|agent)\b/i,
+  /\b(ai|llm|agent)\b.*\b(library|sdk|toolkit)\b/i,
+  /awesome list/i,
+  /curated (list|collection)/i,
+  /cookbook/i,
+  /examples? and tutorials?/i,
+  /\bopen[-_]source\b.*\b(agent|llm|ai)\b/i,
+];
+
+/**
+ * Decide whether a repository looks like an AI framework/library/catalog
+ * rather than a consumer codebase. Conservative — false negatives are
+ * preferable to false positives (we'd rather over-report on a real
+ * customer than silence their findings).
+ */
+export function looksLikeFrameworkRepo(repo: {
+  name?: string;
+  full_name?: string;
+  description?: string | null;
+  topics?: string[] | null;
+}): { isFramework: boolean; reason?: string } {
+  const name = repo.name ?? "";
+  const fullName = repo.full_name ?? "";
+  const desc = repo.description ?? "";
+  const topics = repo.topics ?? [];
+
+  for (const p of FRAMEWORK_REPO_NAME_PATTERNS) {
+    if (p.test(name) || p.test(fullName)) {
+      return {
+        isFramework: true,
+        reason: `Repository name matches a known AI framework pattern (${p.source}).`,
+      };
+    }
+  }
+
+  for (const p of FRAMEWORK_REPO_DESCRIPTION_PATTERNS) {
+    if (p.test(desc)) {
+      return {
+        isFramework: true,
+        reason: `Repository description indicates it is an AI framework, library, or educational collection.`,
+      };
+    }
+  }
+
+  const frameworkTopics = new Set([
+    "langchain",
+    "llm",
+    "llms",
+    "llm-framework",
+    "llm-agent",
+    "ai-agents",
+    "ai-framework",
+    "awesome",
+    "awesome-list",
+    "cookbook",
+    "examples",
+    "tutorial",
+    "tutorials",
+  ]);
+  for (const t of topics) {
+    if (frameworkTopics.has(t.toLowerCase())) {
+      return {
+        isFramework: true,
+        reason: `Repository is tagged with a framework-related topic (${t}).`,
+      };
+    }
+  }
+
+  return { isFramework: false };
+}
 
 // ─── FLAG FILE PATHS TO SCAN ──────────────────────────────────────────────
 export const FLAG_FILE_PATHS = [
