@@ -43,6 +43,11 @@ const AI_FILE_PATTERNS = [
   // Cloud-provider AI service names that don't collide with common English
   "vertex-ai",
   "bedrock-runtime",
+  // Agent frameworks — detect multi-agent and orchestration patterns
+  "crewai",
+  "autogen",
+  "langgraph",
+  "AgentExecutor",
   // Vector DB extensions — a pgvector query is AI usage even without an SDK
   "pgvector",
   "CREATE EXTENSION vector",
@@ -431,7 +436,36 @@ export class GitHubConnector implements NexusConnector {
 }
 
 function inferKind(path: string, content: string): NormalizedAsset["kind"] {
+  // --- Agent detection: path-based (existing) ---
   if (/agent/i.test(path) || /Agent\s*=/i.test(content)) return "agent";
+
+  // --- Agent detection: framework-specific content patterns ---
+  // CrewAI
+  if (/from\s+crewai\b/i.test(content) || /\bCrew\s*\(/i.test(content) ||
+      /\b@agent\b/i.test(content) || /\b@task\b/i.test(content)) return "agent";
+  // AutoGen
+  if (/from\s+autogen\b/i.test(content) || /\bAssistantAgent\b/.test(content) ||
+      /\bUserProxyAgent\b/.test(content) || /\bGroupChat\b/.test(content)) return "agent";
+  // LangGraph
+  if (/from\s+langgraph\b/i.test(content) || /\bStateGraph\b/.test(content) ||
+      /\badd_node\b/.test(content) || /\badd_edge\b/.test(content)) return "agent";
+  // LangChain agents
+  if (/from\s+langchain\.agents\b/i.test(content) || /\bAgentExecutor\b/.test(content) ||
+      /\bcreate_react_agent\b/.test(content) || /\bcreate_openai_functions_agent\b/.test(content)) return "agent";
+  // Semantic Kernel
+  if (/from\s+semantic_kernel\b/i.test(content) || /\bKernelFunction\b/.test(content)) return "agent";
+  // Vercel AI SDK agents
+  if (/\bcreateAgent\b/.test(content) || /\bagent\s*\(/.test(content) && /\btools\s*:/.test(content)) return "agent";
+  // Generic agentic patterns
+  if (/\btool_choice\b/.test(content) || /\bfunction_calling\b/.test(content) ||
+      /\btools\s*=\s*\[/.test(content) || /\bautonomous\b/i.test(content)) return "agent";
+
+  // --- Function detection: serverless + AI ---
+  if ((/\bexports\.handler\b/.test(content) || /\bdef\s+lambda_handler\b/.test(content) ||
+       /\b@app\.route\b/.test(content)) &&
+      (/\bopenai\b/i.test(content) || /\banthropic\b/i.test(content) || /\blangchain\b/i.test(content) ||
+       /\bbedrock\b/i.test(content) || /\bvertex.?ai\b/i.test(content))) return "function";
+
   if (/pipeline/i.test(path)) return "pipeline";
   if (/workflow/i.test(path)) return "workflow";
   if (/\.py$/i.test(path) || /\.js$/i.test(path)) return "script";

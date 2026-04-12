@@ -609,8 +609,16 @@ export const AI_DEPENDENCY_PATTERNS: AIDependency[] = [
   { provider: "together-ai", pattern: /["'`]together(-ai)?["'`]/i },
   { provider: "mistral", pattern: /["'`]@?mistralai?(\/\w+)?["'`]/i },
 
+  // Agent frameworks
+  { provider: "crewai", pattern: /["'`]crewai["'`]/i },
+  { provider: "autogen", pattern: /["'`](autogen|pyautogen)["'`]/i },
+  { provider: "langgraph", pattern: /["'`]langgraph["'`]/i },
+  { provider: "semantic-kernel", pattern: /["'`]semantic[-_]kernel["'`]/i },
+  { provider: "vercel-ai", pattern: /["'`]@ai-sdk\/\w+["'`]/i },
+
   // Meta-SDKs and orchestration
   { provider: "vercel-ai", pattern: /["'`]ai["'`]\s*:\s*["']\^?\d/i }, // Vercel AI SDK shows as "ai": "^x.y.z" in package.json
+  { provider: "vercel-ai", pattern: /["'`]ai["'`]/i }, // Vercel AI npm package
   { provider: "litellm", pattern: /["'`]litellm["'`]/i },
   { provider: "instructor", pattern: /["'`]instructor["'`]/i },
   { provider: "dspy", pattern: /["'`]dspy(-ai)?["'`]/i },
