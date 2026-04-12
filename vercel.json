@@ -19,8 +19,8 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/internal/sync-worker",
-      "schedule": "0 3 * * *"
+      "path": "/api/internal/sync-schedule",
+      "schedule": "0 */1 * * *"
     }
   ]
 }

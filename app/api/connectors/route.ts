@@ -8,6 +8,7 @@ import { getConnector, getConnectorDefinition } from "@/lib/connectors";
 import { canAddConnector } from "@/lib/entitlements";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { DEFAULT_SYNC_SCHEDULE } from "@/lib/cron-utils";
 import type { Organization } from "@/lib/types/platform";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       name?: string;
       credentials?: Record<string, string>;
       config?: Record<string, unknown>;
+      sync_schedule?: string;
     };
     try {
       body = await req.json();
@@ -141,6 +143,7 @@ export async function POST(req: NextRequest) {
         status: "active",
         credentials_encrypted: encryptedCreds,
         config: body.config ?? {},
+        sync_schedule: body.sync_schedule || DEFAULT_SYNC_SCHEDULE,
         created_by: user.id,
       })
       .select()
