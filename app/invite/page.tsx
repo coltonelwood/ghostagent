@@ -96,7 +96,7 @@ function InviteContent() {
           {state === "accepting" && (
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                You&apos;ve been invited to join <strong>{orgName}</strong> on Nexus.
+                You&apos;ve been invited to join <strong>{orgName}</strong> on Spekris.
               </p>
               <Button onClick={accept} className="w-full">
                 Accept Invitation

@@ -202,9 +202,9 @@ export default function FrameworkDetailPage({ params }: { params: Promise<{ fram
       <Card className="border-blue-500/20 bg-blue-500/5">
         <CardContent className="pt-4">
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">How compliance works in Nexus:</strong> Connect
+            <strong className="text-foreground">How compliance works in Spekris:</strong> Connect
             your AI assets, then use the controls below as a checklist. Mark each control&apos;s
-            status. Nexus automatically populates controls where data is available (e.g., logging,
+            status. Spekris automatically populates controls where data is available (e.g., logging,
             risk scoring, ownership).
           </p>
         </CardContent>
