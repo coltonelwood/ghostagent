@@ -1,33 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { verifyInternalKey, verifyCronSecret } from "@/lib/internal-auth";
 import { apiLogger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Internal cleanup job — marks stuck scans as failed.
- * Called by Vercel cron (vercel.json) or external uptime monitor.
- * Protected by INTERNAL_API_KEY.
+ * Internal cleanup job — marks stuck scans as failed. Called either by
+ * Vercel cron (GET with CRON_SECRET) or by an internal service
+ * (POST with INTERNAL_API_KEY). Both paths fail closed on missing
+ * secrets.
  */
-// Vercel cron calls GET with no auth (runs in Vercel's trusted infra)
-// External callers must use POST with x-internal-key
 export async function GET(req: NextRequest) {
-  // Verify Vercel cron secret if configured (Vercel Pro sends Authorization: Bearer <CRON_SECRET>)
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  if (!verifyCronSecret(req)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return handleCleanup();
 }
 
 export async function POST(req: NextRequest) {
-  const key = req.headers.get("x-internal-key") ||
-    req.headers.get("authorization")?.replace("Bearer ", "");
-  const validKey = process.env.INTERNAL_API_KEY;
-  if (!key || key !== validKey) {
+  if (!verifyInternalKey(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return handleCleanup();

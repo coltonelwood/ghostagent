@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAllDueConnectors, syncConnector } from "@/lib/sync-orchestrator";
+import { verifyInternalKey, verifyCronSecret } from "@/lib/internal-auth";
 import { logger } from "@/lib/logger";
 
 export const maxDuration = 300;
 
 /**
- * GET handler for Vercel Cron.
- * Vercel cron jobs call GET — no auth needed (Vercel handles it).
+ * GET handler for Vercel Cron. Fails closed (403) when CRON_SECRET is
+ * missing so a misconfigured deploy never exposes this endpoint
+ * publicly. Env validation normally guarantees the secret is present,
+ * but this is defense-in-depth.
  */
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  if (!verifyCronSecret(req)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   try {
     logger.info("sync-worker: cron triggered — syncing all due connectors");
@@ -27,20 +26,24 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST handler for internal API calls.
- * Auth: INTERNAL_API_KEY header.
- * Body: { connectorId?: string; syncAll?: boolean }
+ * POST handler for internal service-to-service calls (triggered by
+ * /api/connectors on creation, and by /api/connectors/[id]/sync).
+ * Auth: INTERNAL_API_KEY via x-internal-key or Authorization: Bearer.
  */
 export async function POST(req: NextRequest) {
-  const key = req.headers.get("x-internal-key");
-  if (key !== process.env.INTERNAL_API_KEY) {
+  if (!verifyInternalKey(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json() as {
-    connectorId?: string;
-    syncAll?: boolean;
-  };
+  let body: { connectorId?: string; syncAll?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Request body must be JSON" },
+      { status: 400 },
+    );
+  }
 
   // Sync a specific connector
   if (body.connectorId) {

@@ -227,6 +227,17 @@ export const exportRateLimiter = new RateLimiter({
   max: 10, // 10 report exports/hour per user
 });
 
+/**
+ * SDK asset ingest — intentionally generous since the shipped SDK
+ * batches, but still bounded so a compromised SDK key or a runaway
+ * client loop can't drain our DB or burn the risk engine.
+ */
+export const sdkIngestRateLimiter = new RateLimiter({
+  name: "sdk_ingest",
+  windowMs: 60 * 1000, // 1 minute
+  max: 600, // 600 assets/minute/org
+});
+
 // Auto-purge the in-memory fallback every 10 minutes to prevent memory growth.
 if (typeof setInterval !== "undefined") {
   setInterval(
@@ -237,6 +248,7 @@ if (typeof setInterval !== "undefined") {
       inviteRateLimiter.purge();
       syncRateLimiter.purge();
       exportRateLimiter.purge();
+      sdkIngestRateLimiter.purge();
     },
     10 * 60 * 1000,
   );

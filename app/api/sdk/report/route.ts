@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { scoreAsset, buildRiskContext } from "@/lib/risk-engine";
 import { emitEvent } from "@/lib/event-system";
+import { sdkIngestRateLimiter, rateLimitHeaders } from "@/lib/rate-limit";
+import { getPlanLimits } from "@/lib/entitlements";
+import { getOrgAssetCount } from "@/lib/org";
 import { logger } from "@/lib/logger";
-import type { Asset, AssetKind } from "@/lib/types/platform";
+import type { Asset, AssetKind, Organization } from "@/lib/types/platform";
 
 export const dynamic = "force-dynamic";
+
+// Public SDK endpoint — payload cap protects DB/memory from a rogue
+// caller that bypasses our SDK and hits this with junk.
+const MAX_SDK_BODY_BYTES = 16 * 1024;
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -25,10 +32,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const sdkKey = authHeader.slice(7);
+    if (sdkKey.length < 16 || sdkKey.length > 200) {
+      return NextResponse.json({ error: "Invalid SDK API key" }, { status: 401 });
+    }
+
+    // Payload size guard. Done BEFORE DB lookup so a rogue caller
+    // can't hammer the org lookup with oversized requests.
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_SDK_BODY_BYTES) {
+      return NextResponse.json(
+        { error: "Payload too large" },
+        { status: 413 },
+      );
+    }
 
     const { data: org, error: orgErr } = await adminClient
       .from("organizations")
-      .select("id, name, plan")
+      .select("*")
       .eq("sdk_api_key", sdkKey)
       .single();
 
@@ -36,7 +56,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid SDK API key" }, { status: 401 });
     }
 
-    const body = await req.json() as {
+    // Per-org rate limit — 600 asset reports per minute per org, via
+    // Upstash when configured so the limit holds across all Vercel
+    // instances. Keyed on org.id so separate orgs can't interfere
+    // with each other.
+    const rateCheck = await sdkIngestRateLimiter.checkAsync(org.id);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded for SDK ingest. Please slow down or batch requests." },
+        { status: 429, headers: rateLimitHeaders(0, rateCheck.resetAt) },
+      );
+    }
+
+    // Plan cap: don't let SDK ingest blow past the org's asset limit.
+    // This mirrors syncConnector()'s enforcement and is needed here
+    // because SDK report is the one code path that writes assets
+    // without going through syncConnector.
+    const typedOrg = org as unknown as Organization;
+    const planLimits = getPlanLimits(typedOrg);
+    if (planLimits.maxAssets !== -1) {
+      const currentCount = await getOrgAssetCount(typedOrg.id);
+      if (currentCount >= planLimits.maxAssets) {
+        return NextResponse.json(
+          {
+            error: `Your ${typedOrg.plan} plan allows a maximum of ${planLimits.maxAssets} assets. Upgrade to report more.`,
+            code: "ENTITLEMENT_ERROR",
+          },
+          { status: 402 },
+        );
+      }
+    }
+
+    let body: {
       name: string;
       kind?: string;
       owner?: string;
@@ -46,6 +97,14 @@ export async function POST(req: NextRequest) {
       description?: string;
       metadata?: Record<string, unknown>;
     };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Request body must be JSON" },
+        { status: 400 },
+      );
+    }
 
     if (!body.name || typeof body.name !== "string") {
       return NextResponse.json({ error: "name is required and must be a string" }, { status: 400 });
