@@ -122,10 +122,12 @@ function BulkActionBar({
   count,
   onAction,
   onClear,
+  loading,
 }: {
   count: number;
   onAction: (action: string) => void;
   onClear: () => void;
+  loading: boolean;
 }) {
   if (count === 0) return null;
   return (
@@ -134,23 +136,24 @@ function BulkActionBar({
         <span className="nx-tabular">{count}</span> selected
       </span>
       <div className="h-4 w-px bg-border" />
-      <Button variant="ghost" size="xs" onClick={() => onAction("reassign")}>
+      <Button variant="ghost" size="xs" disabled={loading} onClick={() => onAction("reassign")}>
         Reassign
       </Button>
-      <Button variant="ghost" size="xs" onClick={() => onAction("tag")}>
+      <Button variant="ghost" size="xs" disabled={loading} onClick={() => onAction("tag")}>
         Tag
       </Button>
-      <Button variant="ghost" size="xs" onClick={() => onAction("review")}>
+      <Button variant="ghost" size="xs" disabled={loading} onClick={() => onAction("review")}>
         Mark reviewed
       </Button>
-      <Button variant="ghost" size="xs" onClick={() => onAction("archive")}>
+      <Button variant="ghost" size="xs" disabled={loading} onClick={() => onAction("archive")}>
         Archive
       </Button>
       <div className="h-4 w-px bg-border" />
       <button
         type="button"
         onClick={onClear}
-        className="text-xs text-muted-foreground hover:text-foreground"
+        disabled={loading}
+        className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
       >
         Clear
       </button>
@@ -191,6 +194,7 @@ export default function AssetsPage() {
   const [status, setStatus] = useState<string[]>([]);
   const [activeView, setActiveView] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   function applyView(id: string) {
     setActiveView(id);
@@ -267,6 +271,63 @@ export default function AssetsPage() {
     setOwner([]);
     setStatus([]);
     setActiveView("all");
+  }
+
+  async function handleBulkAction(action: string) {
+    const ids = Array.from(selected);
+    let payload: Record<string, unknown> = {};
+
+    if (action === "reassign") {
+      const ownerEmail = window.prompt("Enter the new owner email address:");
+      if (!ownerEmail) return;
+      payload = { owner_email: ownerEmail.trim() };
+    }
+
+    if (action === "tag") {
+      const tagName = window.prompt("Enter a tag name to apply:");
+      if (!tagName) return;
+      payload = { tags: [tagName.trim()] };
+    }
+
+    if (action === "review") {
+      payload = { review_status: "reviewed" };
+    }
+
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/assets/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_ids: ids, action, payload }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        toast.error(json?.error ?? `Bulk ${action} failed`);
+        return;
+      }
+
+      const json = await res.json();
+      const count = json.updated ?? ids.length;
+      const label =
+        action === "review"
+          ? "marked reviewed"
+          : action === "archive"
+            ? "archived"
+            : action === "reassign"
+              ? "reassigned"
+              : "tagged";
+      toast.success(
+        `Successfully ${label} ${count} asset${count === 1 ? "" : "s"}`,
+      );
+
+      setSelected(new Set());
+      fetchAssets();
+    } catch {
+      toast.error(`Failed to ${action} assets. Please try again.`);
+    } finally {
+      setBulkLoading(false);
+    }
   }
 
   return (
@@ -508,8 +569,9 @@ export default function AssetsPage() {
 
       <BulkActionBar
         count={selected.size}
-        onAction={(action) => toast.success(`${action} triggered for ${selected.size} assets`)}
+        onAction={handleBulkAction}
         onClear={() => setSelected(new Set())}
+        loading={bulkLoading}
       />
     </div>
   );

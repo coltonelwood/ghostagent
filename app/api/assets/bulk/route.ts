@@ -11,7 +11,7 @@ const MAX_BULK_IDS = 100;
 
 export const POST = withLogging(async (req: NextRequest) => {
   try {
-    const auth = await requireRole("operator");
+    const auth = await requireRole("admin");
 
     const rl = apiRateLimiter.check(auth.userId);
     if (!rl.allowed) {
@@ -22,19 +22,23 @@ export const POST = withLogging(async (req: NextRequest) => {
     }
 
     const body = (await req.json()) as {
-      assetIds: string[];
+      asset_ids: string[];
       action: "reassign" | "tag" | "review" | "archive";
-      params: Record<string, unknown>;
+      payload: {
+        owner_email?: string;
+        tags?: string[];
+        review_status?: string;
+      };
     };
 
-    if (!body.assetIds || !Array.isArray(body.assetIds) || body.assetIds.length === 0) {
+    if (!body.asset_ids || !Array.isArray(body.asset_ids) || body.asset_ids.length === 0) {
       return NextResponse.json(
-        { error: "assetIds array is required" },
+        { error: "asset_ids array is required" },
         { status: 400 },
       );
     }
 
-    if (body.assetIds.length > MAX_BULK_IDS) {
+    if (body.asset_ids.length > MAX_BULK_IDS) {
       return NextResponse.json(
         { error: `Maximum ${MAX_BULK_IDS} assets per bulk operation` },
         { status: 400 },
@@ -58,104 +62,102 @@ export const POST = withLogging(async (req: NextRequest) => {
 
     const db = getAdminClient();
     const now = new Date().toISOString();
-    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    let updated = 0;
 
     // Verify all assets belong to the org
     const { data: assets } = await db
       .from("assets")
       .select("id")
       .eq("org_id", auth.orgId)
-      .in("id", body.assetIds);
+      .in("id", body.asset_ids);
 
-    const validIds = new Set((assets ?? []).map((a: { id: string }) => a.id));
+    const validIds = (assets ?? []).map((a: { id: string }) => a.id);
 
-    for (const assetId of body.assetIds) {
-      if (!validIds.has(assetId)) {
-        results.push({ id: assetId, success: false, error: "Not found" });
-        continue;
+    if (validIds.length === 0) {
+      return NextResponse.json(
+        { error: "No matching assets found" },
+        { status: 404 },
+      );
+    }
+
+    switch (body.action) {
+      case "reassign": {
+        const ownerEmail = body.payload?.owner_email;
+        if (!ownerEmail) {
+          return NextResponse.json(
+            { error: "payload.owner_email is required for reassign" },
+            { status: 400 },
+          );
+        }
+        const { data: reassigned } = await db
+          .from("assets")
+          .update({
+            owner_email: ownerEmail,
+            owner_status: "active",
+            last_changed_at: now,
+          })
+          .in("id", validIds)
+          .select("id");
+        updated = reassigned?.length ?? 0;
+        break;
       }
 
-      try {
-        switch (body.action) {
-          case "reassign": {
-            const ownerEmail = body.params?.ownerEmail as string;
-            if (!ownerEmail) {
-              results.push({
-                id: assetId,
-                success: false,
-                error: "ownerEmail param required",
-              });
-              break;
-            }
-            await db
-              .from("assets")
-              .update({
-                owner_email: ownerEmail,
-                owner_status: "active_owner",
-                owner_confidence: 100,
-                owner_source: "manual_assignment",
-                last_changed_at: now,
-              })
-              .eq("id", assetId);
-            results.push({ id: assetId, success: true });
-            break;
-          }
-
-          case "tag": {
-            const tags = body.params?.tags as string[];
-            if (!tags || !Array.isArray(tags)) {
-              results.push({
-                id: assetId,
-                success: false,
-                error: "tags param required",
-              });
-              break;
-            }
-            // Merge with existing tags
-            const { data: existing } = await db
-              .from("assets")
-              .select("tags")
-              .eq("id", assetId)
-              .single();
-            const existingTags = (existing?.tags as string[]) ?? [];
-            const merged = [...new Set([...existingTags, ...tags])];
-            await db
-              .from("assets")
-              .update({ tags: merged, last_changed_at: now })
-              .eq("id", assetId);
-            results.push({ id: assetId, success: true });
-            break;
-          }
-
-          case "review": {
-            await db
-              .from("assets")
-              .update({
-                review_status: "reviewed",
-                reviewed_by: auth.userId,
-                reviewed_at: now,
-                last_changed_at: now,
-              })
-              .eq("id", assetId);
-            results.push({ id: assetId, success: true });
-            break;
-          }
-
-          case "archive": {
-            await db
-              .from("assets")
-              .update({ status: "archived", last_changed_at: now })
-              .eq("id", assetId);
-            results.push({ id: assetId, success: true });
-            break;
-          }
+      case "tag": {
+        const tags = body.payload?.tags;
+        if (!tags || !Array.isArray(tags) || tags.length === 0) {
+          return NextResponse.json(
+            { error: "payload.tags is required for tag action" },
+            { status: 400 },
+          );
         }
-      } catch {
-        results.push({
-          id: assetId,
-          success: false,
-          error: "Processing failed",
-        });
+        // Read-modify-write to append tags without duplicates
+        for (const assetId of validIds) {
+          const { data: existing } = await db
+            .from("assets")
+            .select("tags")
+            .eq("id", assetId)
+            .single();
+          const existingTags = (existing?.tags as string[]) ?? [];
+          const merged = [...new Set([...existingTags, ...tags])];
+          const { error } = await db
+            .from("assets")
+            .update({ tags: merged, last_changed_at: now })
+            .eq("id", assetId);
+          if (!error) updated++;
+        }
+        break;
+      }
+
+      case "review": {
+        const reviewStatus = body.payload?.review_status;
+        if (!reviewStatus) {
+          return NextResponse.json(
+            { error: "payload.review_status is required for review action" },
+            { status: 400 },
+          );
+        }
+        const { data: reviewed } = await db
+          .from("assets")
+          .update({
+            review_status: reviewStatus,
+            reviewed_by: auth.userId,
+            reviewed_at: now,
+            last_changed_at: now,
+          })
+          .in("id", validIds)
+          .select("id");
+        updated = reviewed?.length ?? 0;
+        break;
+      }
+
+      case "archive": {
+        const { data: archived } = await db
+          .from("assets")
+          .update({ status: "archived", last_changed_at: now })
+          .in("id", validIds)
+          .select("id");
+        updated = archived?.length ?? 0;
+        break;
       }
     }
 
@@ -166,20 +168,14 @@ export const POST = withLogging(async (req: NextRequest) => {
       action: `asset.bulk.${body.action}`,
       resourceType: "asset",
       metadata: {
-        assetCount: body.assetIds.length,
-        successCount: results.filter((r) => r.success).length,
-        failureCount: results.filter((r) => !r.success).length,
-        params: body.params,
+        asset_ids: body.asset_ids,
+        updated,
+        payload: body.payload,
       },
       req,
     });
 
-    return NextResponse.json({
-      data: results,
-      total: results.length,
-      succeeded: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success).length,
-    });
+    return NextResponse.json({ success: true, updated });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
