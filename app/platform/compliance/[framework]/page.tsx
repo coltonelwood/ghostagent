@@ -202,10 +202,9 @@ export default function FrameworkDetailPage({ params }: { params: Promise<{ fram
       <Card className="border-blue-500/20 bg-blue-500/5">
         <CardContent className="pt-4">
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">How compliance works in Spekris:</strong> Connect
-            your AI assets, then use the controls below as a checklist. Mark each control&apos;s
-            status. Spekris automatically populates controls where data is available (e.g., logging,
-            risk scoring, ownership).
+            <strong className="text-foreground">Compliance is auto-assessed.</strong> Spekris
+            evaluates each control based on your asset data — ownership, risk scoring, documentation,
+            and review status. You can override any assessment manually if needed.
           </p>
         </CardContent>
       </Card>

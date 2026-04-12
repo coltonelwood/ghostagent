@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getOrCreateOrgForUser, requireOrgMember } from "@/lib/org";
 import { complianceReport } from "@/lib/compliance/report-generator";
+import { autoMapCompliance } from "@/lib/compliance/auto-mapper";
 import { withLogging } from "@/lib/api-handler";
 import { logger } from "@/lib/logger";
 
@@ -33,6 +34,9 @@ export const GET = withLogging(async (
   await requireOrgMember(user.id, org.id, "viewer");
 
   try {
+    await autoMapCompliance(org.id).catch((e) =>
+      logger.warn({ e }, "compliance auto-map skipped")
+    );
     const report = await complianceReport(org.id, framework);
     return NextResponse.json({ data: report });
   } catch (err) {
