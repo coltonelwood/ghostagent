@@ -180,10 +180,10 @@ export default function OnboardingPage() {
           <Link href="/" className="flex items-center gap-2">
             <div className="flex size-6 items-center justify-center rounded bg-primary">
               <span className="text-[10px] font-semibold text-primary-foreground">
-                N
+                S
               </span>
             </div>
-            <span className="text-sm font-semibold">Nexus</span>
+            <span className="text-sm font-semibold">Spekris</span>
           </Link>
           <button
             type="button"

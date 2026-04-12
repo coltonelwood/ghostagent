@@ -170,7 +170,7 @@ async function dispatchSlack(
 ): Promise<void> {
   const icons: Record<Severity, string> = { info: "ℹ️", low: "🔵", medium: "🟡", high: "🟠", critical: "🔴" };
   const payload: Record<string, unknown> = {
-    text: `${icons[severity]} *Nexus Alert* — ${title}`,
+    text: `${icons[severity]} *Spekris Alert* — ${title}`,
     blocks: [{
       type: "section",
       text: {
@@ -179,7 +179,7 @@ async function dispatchSlack(
       },
       accessory: {
         type: "button",
-        text: { type: "plain_text", text: "View in Nexus" },
+        text: { type: "plain_text", text: "View in Spekris" },
         url: `${process.env.NEXT_PUBLIC_APP_URL}/platform/events`,
       },
     }],
@@ -252,13 +252,13 @@ async function dispatchEmail(
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
 
-  const html = `<div style="font-family:sans-serif;max-width:600px"><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}<p style="color:#6b7280;font-size:12px">Severity: ${severity.toUpperCase()} | Event: ${kind}</p><a href="${process.env.NEXT_PUBLIC_APP_URL}/platform/events" style="background:#0f172a;color:white;padding:8px 16px;border-radius:6px;text-decoration:none">View in Nexus</a></div>`;
+  const html = `<div style="font-family:sans-serif;max-width:600px"><h2>${title}</h2>${body ? `<p>${body}</p>` : ""}<p style="color:#6b7280;font-size:12px">Severity: ${severity.toUpperCase()} | Event: ${kind}</p><a href="${process.env.NEXT_PUBLIC_APP_URL}/platform/events" style="background:#0f172a;color:white;padding:8px 16px;border-radius:6px;text-decoration:none">View in Spekris</a></div>`;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "Nexus <alerts@nexus.ai>", to: recipients, subject: `[Nexus] ${severity.toUpperCase()}: ${title}`, html }),
+      body: JSON.stringify({ from: "Spekris <alerts@spekris.ai>", to: recipients, subject: `[Spekris] ${severity.toUpperCase()}: ${title}`, html }),
     });
     if (!res.ok) throw new Error(`Resend ${res.status}`);
 
