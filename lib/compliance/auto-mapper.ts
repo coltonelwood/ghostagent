@@ -170,7 +170,6 @@ export async function autoMapCompliance(orgId: string): Promise<{ mapped: number
     org_id: string;
     status: ControlStatus;
     evidence: string[];
-    auto_mapped: boolean;
   }> = [];
 
   for (const fw of BUILTIN_FRAMEWORKS) {
@@ -187,7 +186,6 @@ export async function autoMapCompliance(orgId: string): Promise<{ mapped: number
           org_id: orgId,
           status,
           evidence: [`Auto-assessed based on asset attributes (${new Date().toISOString().slice(0, 10)})`],
-          auto_mapped: true,
         });
       }
     }
@@ -201,7 +199,7 @@ export async function autoMapCompliance(orgId: string): Promise<{ mapped: number
     const batch = mappings.slice(i, i + 100);
     const { error } = await db
       .from("compliance_mappings")
-      .upsert(batch, { onConflict: "framework_id,control_id,asset_id" });
+      .upsert(batch, { onConflict: "org_id,asset_id,framework_id,control_id" });
 
     if (error) {
       log.error({ orgId, error, batch: i }, "Failed to upsert compliance mappings");
