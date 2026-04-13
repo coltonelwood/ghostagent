@@ -132,8 +132,23 @@ const TESTIMONIALS = [
 
 const PLANS = [
   {
+    name: "Free",
+    price: "$0",
+    period: "",
+    description: "Explore Spekris with a single source.",
+    features: [
+      "1 connector",
+      "50 AI assets",
+      "Risk scoring + ownership",
+      "1 compliance framework",
+      "Email alerts",
+    ],
+    cta: "Start free",
+    highlighted: false,
+  },
+  {
     name: "Starter",
-    price: "$499",
+    price: "$99",
     period: "/month",
     description: "For teams starting an AI governance program.",
     features: [
@@ -695,7 +710,7 @@ export default function LandingPage() {
             Straightforward pricing. No gotchas.
           </h2>
 
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {PLANS.map((plan) => (
               <div
                 key={plan.name}
