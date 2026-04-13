@@ -1,2 +1,2 @@
-// Deploy trigger v13
-export const DEPLOY_VERSION = "v13.2026-04-12-production-fixes";
+// Deploy trigger v14
+export const DEPLOY_VERSION = "v14.2026-04-12-free-tier";
