@@ -372,7 +372,7 @@ export default function LandingPage() {
               href="/auth/login"
               className={buttonVariants({ size: "sm" })}
             >
-              Start free trial
+              Start free
               <ArrowRight className="size-3.5" />
             </Link>
           </div>
@@ -383,9 +383,9 @@ export default function LandingPage() {
       <section className="relative border-b border-border">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-5 lg:py-24">
           <div className="space-y-6 lg:col-span-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-primary" />
-              AI system visibility and control
+            <div className="inline-flex items-center gap-2 rounded-full border border-warning/30 bg-warning/5 px-3 py-1 text-xs text-warning">
+              <span className="size-1.5 rounded-full bg-warning" />
+              EU AI Act enforcement starts August 2026
             </div>
             <h1 className="text-[2.5rem] font-semibold leading-[1.1] tracking-tight sm:text-5xl">
               Know the AI systems running across your company.

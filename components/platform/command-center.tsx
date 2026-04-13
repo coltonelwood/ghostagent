@@ -591,11 +591,25 @@ function EmptyDashboard() {
         </div>
         <h2 className="text-xl font-semibold tracking-tight">Connect your first source</h2>
         <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-          Link GitHub, GitLab, AWS, or an automation platform. Spekris will automatically scan for AI agents, LLM integrations, and ML workflows, then score risk and surface what needs attention.
+          Link GitHub, GitLab, AWS, or an automation platform. Spekris will
+          automatically scan for AI agents, LLM integrations, and ML workflows,
+          then score risk and surface what needs attention.
         </p>
-        <Link href="/platform/connectors" className={buttonVariants({ size: "lg" })}>
-          Add connector <ArrowRight className="size-4" />
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href="/platform/connectors" className={buttonVariants({ size: "lg" })}>
+            Add connector <ArrowRight className="size-4" />
+          </Link>
+          <Link href="/demo" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            See it in action
+          </Link>
+        </div>
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-left max-w-md">
+          <Clock className="size-4 shrink-0 text-warning" />
+          <p className="text-[12px] text-muted-foreground">
+            <span className="font-semibold text-foreground">EU AI Act enforcement starts August 2026.</span>{" "}
+            Start building your AI inventory now so you are ready when auditors ask.
+          </p>
+        </div>
       </div>
     </div>
   );
